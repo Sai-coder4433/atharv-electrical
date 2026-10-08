@@ -21,7 +21,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       const types = Array.from(new Set(product.variants.map((v) => v.name)));
       types.forEach((type) => {
         const first = product.variants?.find((v) => v.name === type);
-        if (first) initial[type] = first.value;
+        if (first && first.value) initial[type] = first.value;
       });
     }
     return initial;
@@ -139,7 +139,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 key={vr.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setSelectedVariants((prev) => ({ ...prev, [vr.name]: vr.value }));
+                  if (vr.value) {
+                    setSelectedVariants((prev) => ({ ...prev, [vr.name]: vr.value as string }));
+                  }
                 }}
                 className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
                   selectedVariants[vr.name] === vr.value

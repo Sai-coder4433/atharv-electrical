@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Layers,
+  Award,
   Plus,
   Edit2,
   Trash2,
@@ -9,101 +9,89 @@ import {
   X,
   Eye,
   EyeOff,
-  MoveUp,
-  MoveDown,
+  ExternalLink,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
-import { Category } from '../../types';
+import { BrandItem } from '../../types';
 import { uploadToStorage } from '../../firebase/services';
 
-export const AdminCategories: React.FC = () => {
-  const { categories, products, addCategory, updateCategory, deleteCategory, showToast } = useApp();
+export const AdminBrands: React.FC = () => {
+  const { brands, products, addBrand, updateBrand, deleteBrand, showToast } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [editingBrand, setEditingBrand] = useState<BrandItem | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
+    logoUrl: '',
     description: '',
-    image: '',
-    icon: 'Layers',
-    displayOrder: 1,
     isActive: true,
   });
 
   const handleOpenAdd = () => {
-    setEditingCategory(null);
+    setEditingBrand(null);
     setFormData({
       name: '',
       slug: '',
+      logoUrl: '',
       description: '',
-      image: '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
-      icon: 'Layers',
-      displayOrder: categories.length + 1,
       isActive: true,
     });
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (cat: Category) => {
-    setEditingCategory(cat);
+  const handleOpenEdit = (brand: BrandItem) => {
+    setEditingBrand(brand);
     setFormData({
-      name: cat.name,
-      slug: cat.slug,
-      description: cat.description,
-      image: cat.image || '',
-      icon: cat.icon || 'Layers',
-      displayOrder: cat.displayOrder || 1,
-      isActive: cat.isActive !== false,
+      name: brand.name,
+      slug: brand.slug,
+      logoUrl: brand.logoUrl || '',
+      description: brand.description || '',
+      isActive: brand.isActive,
     });
     setIsModalOpen(true);
   };
 
-  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingImage(true);
+    setUploadingLogo(true);
     try {
-      const url = await uploadToStorage(file, 'categories');
-      setFormData((prev) => ({ ...prev, image: url }));
-      showToast('Category image uploaded successfully', 'success');
+      const url = await uploadToStorage(file, 'brands');
+      setFormData((prev) => ({ ...prev, logoUrl: url }));
+      showToast('Brand logo uploaded successfully', 'success');
     } catch (err: any) {
-      showToast(err.message || 'Image upload failed', 'error');
+      showToast(err.message || 'Logo upload failed', 'error');
     } finally {
-      setUploadingImage(false);
+      setUploadingLogo(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      showToast('Category name is required', 'error');
+      showToast('Brand name is required', 'error');
       return;
     }
 
     const slug = formData.slug.trim() || formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    if (editingCategory) {
-      await updateCategory(editingCategory.id, {
+    if (editingBrand) {
+      await updateBrand(editingBrand.id, {
         name: formData.name,
         slug,
+        logoUrl: formData.logoUrl,
         description: formData.description,
-        image: formData.image,
-        icon: formData.icon,
-        displayOrder: Number(formData.displayOrder),
         isActive: formData.isActive,
       });
     } else {
-      await addCategory({
+      await addBrand({
         name: formData.name,
         slug,
+        logoUrl: formData.logoUrl,
         description: formData.description,
-        image: formData.image,
-        icon: formData.icon,
-        subcategories: [],
-        displayOrder: Number(formData.displayOrder),
         isActive: formData.isActive,
       });
     }
@@ -113,14 +101,14 @@ export const AdminCategories: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-            Category Management
+            Brand Management
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            Add, update and reorder root electrical categories. Synced with Firebase.
+            Manage authorized partner brands (ORIENT, Goldmedal, etc.) and store logos.
           </p>
         </div>
         <button
@@ -128,62 +116,68 @@ export const AdminCategories: React.FC = () => {
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-atharvay-gradient shadow-xs hover:shadow"
         >
           <Plus className="w-4 h-4" />
-          <span>Add Category</span>
+          <span>Add Brand</span>
         </button>
       </div>
 
-      {/* Categories Grid */}
+      {/* Brand Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {categories.map((cat) => {
-          const catProducts = products.filter((p) => p.categoryId === cat.id);
-          const isEnabled = cat.isActive !== false;
+        {brands.map((brand) => {
+          const brandProducts = products.filter(
+            (p) => p.brand?.toLowerCase() === brand.name?.toLowerCase() || p.brandId === brand.id
+          );
 
           return (
             <div
-              key={cat.id}
-              className={`bg-white rounded-2xl border transition-all shadow-xs flex flex-col justify-between overflow-hidden ${
-                isEnabled ? 'border-gray-200' : 'border-gray-200 opacity-60 bg-gray-50'
+              key={brand.id}
+              className={`bg-white rounded-2xl border p-5 shadow-xs flex flex-col justify-between transition-all ${
+                brand.isActive ? 'border-gray-200' : 'border-gray-200 opacity-60 bg-gray-50'
               }`}
             >
-              {/* Category Card Header & Image */}
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-3 pb-3 border-b border-gray-100">
+              <div>
+                <div className="flex items-start justify-between pb-3 border-b border-gray-100">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-50 text-[#FF6A00] flex items-center justify-center font-bold text-sm shrink-0 border border-orange-100">
-                      <Layers className="w-5 h-5" />
+                    <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-[#FF6A00] flex items-center justify-center p-1.5 overflow-hidden shrink-0">
+                      {brand.logoUrl ? (
+                        <img
+                          src={brand.logoUrl}
+                          alt={brand.name}
+                          className="w-full h-full object-contain"
+                        />
+                      ) : (
+                        <Award className="w-6 h-6 text-[#FF6A00]" />
+                      )}
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm text-gray-900">{cat.name}</h3>
-                      <span className="text-[11px] text-gray-400 font-mono">/{cat.slug}</span>
+                      <h3 className="font-bold text-sm text-gray-900">{brand.name}</h3>
+                      <span className="text-[11px] font-mono text-gray-400">/{brand.slug}</span>
                     </div>
                   </div>
 
                   <span
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      isEnabled ? 'bg-green-50 text-[#168A45]' : 'bg-gray-200 text-gray-600'
+                      brand.isActive ? 'bg-green-100 text-[#168A45]' : 'bg-gray-200 text-gray-600'
                     }`}
                   >
-                    {isEnabled ? 'Active' : 'Disabled'}
+                    {brand.isActive ? 'Active' : 'Disabled'}
                   </span>
                 </div>
 
-                <p className="text-xs text-gray-600 mt-3 line-clamp-2">{cat.description}</p>
+                <p className="text-xs text-gray-600 mt-3">{brand.description || 'Authorized partner brand.'}</p>
 
-                <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+                <div className="mt-4 flex items-center justify-between text-xs">
                   <span className="font-semibold text-[#FF6A00] bg-orange-50 px-2.5 py-1 rounded-md">
-                    {catProducts.length} live products
+                    {brandProducts.length} Products Linked
                   </span>
-                  <span className="text-[11px] font-mono text-gray-400">Order: {cat.displayOrder || 1}</span>
                 </div>
               </div>
 
-              {/* Action Bar */}
-              <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+              <div className="mt-5 pt-3 border-t border-gray-100 flex items-center justify-between">
                 <button
-                  onClick={() => updateCategory(cat.id, { isActive: !isEnabled })}
+                  onClick={() => updateBrand(brand.id, { isActive: !brand.isActive })}
                   className="text-xs font-semibold text-gray-600 hover:text-gray-900 flex items-center gap-1"
                 >
-                  {isEnabled ? (
+                  {brand.isActive ? (
                     <>
                       <EyeOff className="w-3.5 h-3.5 text-gray-400" />
                       <span>Disable</span>
@@ -198,20 +192,20 @@ export const AdminCategories: React.FC = () => {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleOpenEdit(cat)}
-                    className="p-1.5 rounded-lg text-gray-600 hover:text-[#FF6A00] hover:bg-orange-50"
-                    title="Edit Category"
+                    onClick={() => handleOpenEdit(brand)}
+                    className="p-1.5 text-gray-500 hover:text-[#FF6A00] hover:bg-orange-50 rounded-lg"
+                    title="Edit Brand"
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
                     onClick={() => {
-                      if (confirm(`Are you sure you want to delete category "${cat.name}"?`)) {
-                        deleteCategory(cat.id);
+                      if (confirm(`Delete brand "${brand.name}"?`)) {
+                        deleteBrand(brand.id);
                       }
                     }}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"
-                    title="Delete Category"
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                    title="Delete Brand"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -222,13 +216,13 @@ export const AdminCategories: React.FC = () => {
         })}
       </div>
 
-      {/* Add / Edit Category Modal */}
+      {/* Add / Edit Brand Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-gray-200">
             <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
               <h3 className="font-bold text-base text-gray-900">
-                {editingCategory ? 'Edit Category' : 'Create New Category'}
+                {editingBrand ? 'Edit Brand' : 'Register New Brand'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
@@ -240,7 +234,7 @@ export const AdminCategories: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Category Name *</label>
+                <label className="block font-bold text-gray-700 mb-1">Brand Name *</label>
                 <input
                   type="text"
                   required
@@ -252,79 +246,66 @@ export const AdminCategories: React.FC = () => {
                       slug: e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
                     }))
                   }
-                  placeholder="e.g. Fans, Lights, Switches"
+                  placeholder="e.g. ORIENT, Goldmedal, Havells"
                   className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Slug (URL)</label>
+                <label className="block font-bold text-gray-700 mb-1">Slug</label>
                 <input
                   type="text"
                   value={formData.slug}
                   onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-                  placeholder="e.g. fans"
                   className="w-full font-mono px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Description</label>
+                <label className="block font-bold text-gray-700 mb-1">Brand Description</label>
                 <textarea
                   rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Short description for storefront display..."
+                  placeholder="Brand description and authorized partner note..."
                   className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
                 />
               </div>
 
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Category Image (Firebase Storage / URL)</label>
+                <label className="block font-bold text-gray-700 mb-1">Brand Logo (Storage / URL)</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    value={formData.image}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, image: e.target.value }))}
-                    placeholder="https://... or upload image"
+                    value={formData.logoUrl}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, logoUrl: e.target.value }))}
+                    placeholder="https://... or upload file"
                     className="flex-1 px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
                   />
                   <label className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl cursor-pointer flex items-center gap-1 shrink-0">
                     <Upload className="w-3.5 h-3.5" />
-                    <span>{uploadingImage ? 'Uploading...' : 'Upload'}</span>
+                    <span>{uploadingLogo ? '...' : 'Upload'}</span>
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handleImageFileChange}
-                      disabled={uploadingImage}
+                      onChange={handleLogoUpload}
+                      disabled={uploadingLogo}
                       className="hidden"
                     />
                   </label>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Display Order</label>
-                  <input
-                    type="number"
-                    value={formData.displayOrder}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, displayOrder: Number(e.target.value) }))}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-gray-700 mb-1">Status</label>
-                  <select
-                    value={formData.isActive ? 'active' : 'disabled'}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.value === 'active' }))}
-                    className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
-                  >
-                    <option value="active">Active (Visible)</option>
-                    <option value="disabled">Disabled (Hidden)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Status</label>
+                <select
+                  value={formData.isActive ? 'active' : 'disabled'}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, isActive: e.target.value === 'active' }))}
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
+                >
+                  <option value="active">Active (Visible)</option>
+                  <option value="disabled">Disabled</option>
+                </select>
               </div>
 
               <div className="pt-3 border-t border-gray-100 flex items-center justify-end gap-2">
@@ -337,10 +318,10 @@ export const AdminCategories: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  disabled={uploadingImage}
+                  disabled={uploadingLogo}
                   className="px-5 py-2 rounded-xl text-white font-bold bg-atharvay-gradient shadow-xs hover:shadow"
                 >
-                  {editingCategory ? 'Update Category' : 'Save Category'}
+                  {editingBrand ? 'Update Brand' : 'Save Brand'}
                 </button>
               </div>
             </form>

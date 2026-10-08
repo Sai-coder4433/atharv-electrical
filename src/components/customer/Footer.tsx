@@ -151,10 +151,10 @@ export const Footer: React.FC = () => {
             </h4>
             <div className="space-y-2 text-xs text-gray-400 leading-relaxed">
               <p className="font-semibold text-white">ATHARV ELECTRICAL</p>
-              <p>
-                Shop No. 18, Ramkrishna Complex,<br />
-                Opp. Indrayani Bank, Manik Chowk,<br />
-                Chakan, Pune, Maharashtra – 410501
+              <p className="text-gray-300">
+                Manik Chowk,<br />
+                Chakan,<br />
+                India
               </p>
               <p className="pt-1">
                 <a

@@ -1,5 +1,7 @@
 import {
   Category,
+  SubcategoryItem,
+  BrandItem,
   Product,
   Order,
   Customer,
@@ -11,9 +13,10 @@ import {
 export const HERO_BANNERS_DATA: HeroBanner[] = [
   {
     id: 'banner-1',
-    title: 'Upgrade Your Airflow',
-    subtitle: 'Explore premium fans for every room.',
-    ctaText: 'Shop Fans',
+    title: 'Smart BLDC Energy Saving Fans',
+    subtitle: 'Orient Electric 5-star silent inverter fans with aerodynamic blades.',
+    ctaText: 'Explore Fans',
+    ctaLink: 'fans',
     categoryFilter: 'fans',
     brandFilter: 'ORIENT',
     brandTag: 'ORIENT Electric',
@@ -23,9 +26,10 @@ export const HERO_BANNERS_DATA: HeroBanner[] = [
   },
   {
     id: 'banner-2',
-    title: 'Light Up Every Corner',
-    subtitle: 'Modern LED lighting for every space.',
-    ctaText: 'Shop Lights',
+    title: 'Architectural LED Lighting Solutions',
+    subtitle: 'Glare-free slim panel lights, downlights & decorative battens for every room.',
+    ctaText: 'Explore Lights',
+    ctaLink: 'lights',
     categoryFilter: 'lights',
     brandFilter: 'Goldmedal',
     brandTag: 'Goldmedal LED',
@@ -35,9 +39,10 @@ export const HERO_BANNERS_DATA: HeroBanner[] = [
   },
   {
     id: 'banner-3',
-    title: 'Complete Electrical Solutions',
-    subtitle: 'Switches, wires and safety breakers.',
-    ctaText: 'Shop Electricals',
+    title: 'Designer Modular Switches & Safety MCB',
+    subtitle: 'Touch switches, glass plates, FR copper house wires & circuit protection.',
+    ctaText: 'Explore Switches',
+    ctaLink: 'switches',
     categoryFilter: 'switches',
     brandFilter: 'Goldmedal',
     brandTag: 'Goldmedal & Havells',
@@ -168,6 +173,71 @@ export const CATEGORIES_DATA: Category[] = [
       'Heavy Duty Metal Exhaust',
     ],
   },
+];
+
+export const BRANDS_DATA: BrandItem[] = [
+  {
+    id: 'orient',
+    name: 'ORIENT',
+    slug: 'orient',
+    logoUrl: 'https://i.postimg.cc/pLmDNdQ8/Whats-App-Image-2026-09-27-at-18-49-05.jpg',
+    description: 'Orient Electric — BLDC Energy-Saver Fans, High-Speed Fans, Exhaust Fans & Small Appliances.',
+    isActive: true,
+  },
+  {
+    id: 'goldmedal',
+    name: 'Goldmedal',
+    slug: 'goldmedal',
+    logoUrl: 'https://i.postimg.cc/pLmDNdQ8/Whats-App-Image-2026-09-27-at-18-49-05.jpg',
+    description: 'Goldmedal Systems — Designer Modular Switches, Glass Plates, LED Panels, Battens & Safety Breakers.',
+    isActive: true,
+  },
+];
+
+export const SUBCATEGORIES_DATA: SubcategoryItem[] = [
+  // FANS
+  { id: 'sub-fans-ceiling', name: 'Ceiling Fans', slug: 'ceiling-fans', categoryId: 'fans', description: 'Standard high-speed ceiling fans', isActive: true, displayOrder: 1 },
+  { id: 'sub-fans-bldc', name: 'BLDC Fans', slug: 'bldc-fans', categoryId: 'fans', description: 'Energy saving inverter BLDC fans with remote', isActive: true, displayOrder: 2 },
+  { id: 'sub-fans-exhaust', name: 'Exhaust Fans', slug: 'exhaust-fans', categoryId: 'fans', description: 'Ventilation fans for kitchens and bathrooms', isActive: true, displayOrder: 3 },
+  { id: 'sub-fans-decorative', name: 'Decorative Fans', slug: 'decorative-fans', categoryId: 'fans', description: 'Designer under-light and wooden finish fans', isActive: true, displayOrder: 4 },
+  { id: 'sub-fans-table', name: 'Table Fans', slug: 'table-fans', categoryId: 'fans', description: 'Compact portable high-thrust table fans', isActive: true, displayOrder: 5 },
+  { id: 'sub-fans-pedestal', name: 'Pedestal Fans', slug: 'pedestal-fans', categoryId: 'fans', description: 'Oscillating stand fans with height adjustment', isActive: true, displayOrder: 6 },
+
+  // LIGHTS
+  { id: 'sub-lights-led-bulbs', name: 'LED Bulbs', slug: 'led-bulbs', categoryId: 'lights', description: 'B22 & E27 energy-saving LED bulbs', isActive: true, displayOrder: 1 },
+  { id: 'sub-lights-panel', name: 'Panel Lights', slug: 'panel-lights', categoryId: 'lights', description: 'Slim recessed and surface LED ceiling panels', isActive: true, displayOrder: 2 },
+  { id: 'sub-lights-downlights', name: 'Downlights', slug: 'downlights', categoryId: 'lights', description: 'Spot COB downlights with focused beam', isActive: true, displayOrder: 3 },
+  { id: 'sub-lights-tube', name: 'Tube Lights', slug: 'tube-lights', categoryId: 'lights', description: 'T5 and T8 LED tube lights', isActive: true, displayOrder: 4 },
+  { id: 'sub-lights-batten', name: 'Batten Lights', slug: 'batten-lights', categoryId: 'lights', description: 'Slim glare-free linear battens', isActive: true, displayOrder: 5 },
+  { id: 'sub-lights-flood', name: 'Flood Lights', slug: 'flood-lights', categoryId: 'lights', description: 'Outdoor waterproof LED floodlights', isActive: true, displayOrder: 6 },
+  { id: 'sub-lights-decorative', name: 'Decorative Lights', slug: 'decorative-lights', categoryId: 'lights', description: 'Warm accent & mood lighting fixtures', isActive: true, displayOrder: 7 },
+  { id: 'sub-lights-street', name: 'Street Lights', slug: 'street-lights', categoryId: 'lights', description: 'High lumen outdoor street lamps', isActive: true, displayOrder: 8 },
+
+  // SWITCHES & SOCKETS
+  { id: 'sub-switches-modular', name: 'Modular Switches', slug: 'modular-switches', categoryId: 'switches', description: '10A & 20A smooth action modular switches', isActive: true, displayOrder: 1 },
+  { id: 'sub-switches-sockets', name: 'Sockets', slug: 'sockets', categoryId: 'switches', description: 'Universal shuttered safe sockets', isActive: true, displayOrder: 2 },
+  { id: 'sub-switches-usb', name: 'USB Sockets', slug: 'usb-sockets', categoryId: 'switches', description: 'Fast charge USB-A & USB-C wall modules', isActive: true, displayOrder: 3 },
+  { id: 'sub-switches-regulators', name: 'Fan Regulators', slug: 'fan-regulators', categoryId: 'switches', description: 'Step type hum-free rotary regulators', isActive: true, displayOrder: 4 },
+  { id: 'sub-switches-plates', name: 'Switch Plates', slug: 'switch-plates', categoryId: 'switches', description: 'Glass and metallic cover frame plates', isActive: true, displayOrder: 5 },
+
+  // WIRES & CABLES
+  { id: 'sub-wires-house', name: 'House Wires', slug: 'house-wires', categoryId: 'wires', description: 'FR & FRLS 100% pure copper single core wires', isActive: true, displayOrder: 1 },
+  { id: 'sub-wires-flexible', name: 'Flexible Cables', slug: 'flexible-cables', categoryId: 'wires', description: 'Multi-strand PVC insulated flexible cables', isActive: true, displayOrder: 2 },
+  { id: 'sub-wires-power', name: 'Power Cables', slug: 'power-cables', categoryId: 'wires', description: 'Heavy duty armored industrial power cables', isActive: true, displayOrder: 3 },
+  { id: 'sub-wires-multicore', name: 'Multicore Cables', slug: 'multicore-cables', categoryId: 'wires', description: 'Round 3-core and 4-core copper cables', isActive: true, displayOrder: 4 },
+
+  // MCB & PROTECTION
+  { id: 'sub-mcb-single', name: 'MCB', slug: 'mcb', categoryId: 'mcb', description: 'Single & double pole miniature circuit breakers', isActive: true, displayOrder: 1 },
+  { id: 'sub-mcb-rccb', name: 'RCCB', slug: 'rccb', categoryId: 'mcb', description: 'Residual current circuit breakers for earth leakage', isActive: true, displayOrder: 2 },
+  { id: 'sub-mcb-db', name: 'Distribution Boards', slug: 'distribution-boards', categoryId: 'mcb', description: 'SPN & TPN metal double door DB enclosures', isActive: true, displayOrder: 3 },
+  { id: 'sub-mcb-surge', name: 'Surge Protection', slug: 'surge-protection', categoryId: 'mcb', description: 'Lightning and spike arresters', isActive: true, displayOrder: 4 },
+
+  // ELECTRICAL ACCESSORIES
+  { id: 'sub-acc-extension', name: 'Extension Boards', slug: 'extension-boards', categoryId: 'accessories', description: 'Spike guards and heavy load extension boards', isActive: true, displayOrder: 1 },
+  { id: 'sub-acc-holders', name: 'Holders', slug: 'holders', categoryId: 'accessories', description: 'Angle and batten brass lamp holders', isActive: true, displayOrder: 2 },
+  { id: 'sub-acc-adapters', name: 'Adapters', slug: 'adapters', categoryId: 'accessories', description: '2-pin and 3-pin conversion adapters', isActive: true, displayOrder: 3 },
+  { id: 'sub-acc-plugs', name: 'Plugs', slug: 'plugs', categoryId: 'accessories', description: 'Top plugs 6A & 16A with cord grip', isActive: true, displayOrder: 4 },
+  { id: 'sub-acc-connectors', name: 'Connectors', slug: 'connectors', categoryId: 'accessories', description: 'Wire connectors, caps and junction blocks', isActive: true, displayOrder: 5 },
 ];
 
 // Helper to create product data
@@ -1380,12 +1450,12 @@ export const DEMO_REVIEWS: ProductReview[] = [
 export const STORE_LOCATION_DATA = {
   name: 'ATHARV ELECTRICAL',
   tagline: 'Authorized Partner for ORIENT Electric & Goldmedal Modular Systems',
-  address: 'Shop No. 18, Ramkrishna Complex, Opp. Indrayani Bank, Manik Chowk, Chakan, Pune, Maharashtra – 410501',
+  address: 'Manik Chowk, Chakan, India',
   phone: '+91 77200 36820',
   whatsapp: '+917720036820',
   email: 'contact@atharvelectrical.com',
   workingHours: 'Monday - Sunday: 9:30 AM to 9:00 PM (Open all 7 Days)',
-  googleMapsUrl: 'https://maps.google.com/?q=Ramkrishna+Complex+Manik+Chowk+Chakan+Pune',
+  googleMapsUrl: 'https://maps.google.com/?q=Manik+Chowk+Chakan+India',
   latitude: 18.7599,
   longitude: 73.8596,
   features: [

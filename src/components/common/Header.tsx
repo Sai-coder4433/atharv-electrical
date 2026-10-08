@@ -31,6 +31,11 @@ export const Header: React.FC = () => {
     products,
     searchQuery,
     setSearchQuery,
+    authUser,
+    setActiveMode,
+    setAdminView,
+    setIsAdminLoginModalOpen,
+    setIsLoginModalOpen,
   } = useApp();
 
   const [isShopMegaOpen, setIsShopMegaOpen] = useState(false);
@@ -134,15 +139,15 @@ export const Header: React.FC = () => {
               className="flex items-center gap-1.5 text-gray-200 hover:text-white"
             >
               <PhoneCall className="w-3.5 h-3.5 text-[#FF8A00]" />
-              <span>Store Helpline: +91 77200 36820 (Chakan, Pune)</span>
+              <span>Store Helpline: +91 77200 36820 (Manik Chowk, Chakan)</span>
             </a>
             <span className="text-[#FF8A00] font-black">·</span>
             <span className="text-gray-300">
-              Showroom: Shop No. 18, Ramkrishna Complex, Opp. Indrayani Bank, Manik Chowk, Chakan
+              Showroom: Manik Chowk, Chakan, India
             </span>
             <span className="text-[#FF8A00] font-black">·</span>
             <span className="text-gray-200">
-              100% Original Brand Warranty & Official GST Input Invoices
+              100% Original Brand Warranty & Official GST Invoicing
             </span>
             <span className="text-[#FF8A00] font-black">·</span>
           </div>
@@ -163,15 +168,15 @@ export const Header: React.FC = () => {
               className="flex items-center gap-1.5 text-gray-200 hover:text-white"
             >
               <PhoneCall className="w-3.5 h-3.5 text-[#FF8A00]" />
-              <span>Store Helpline: +91 77200 36820 (Chakan, Pune)</span>
+              <span>Store Helpline: +91 77200 36820 (Manik Chowk, Chakan)</span>
             </a>
             <span className="text-[#FF8A00] font-black">·</span>
             <span className="text-gray-300">
-              Showroom: Shop No. 18, Ramkrishna Complex, Opp. Indrayani Bank, Manik Chowk, Chakan
+              Showroom: Manik Chowk, Chakan, India
             </span>
             <span className="text-[#FF8A00] font-black">·</span>
             <span className="text-gray-200">
-              100% Original Brand Warranty & Official GST Input Invoices
+              100% Original Brand Warranty & Official GST Invoicing
             </span>
             <span className="text-[#FF8A00] font-black">·</span>
           </div>
@@ -408,14 +413,37 @@ export const Header: React.FC = () => {
 
           {/* Account */}
           <button
-            onClick={() => setCustomerView('account')}
+            onClick={() => {
+              if (authUser) {
+                setCustomerView('account');
+              } else {
+                setIsLoginModalOpen(true);
+              }
+            }}
             className={`flex items-center gap-1 text-xs font-semibold text-[#666666] hover:text-[#171717] px-2.5 py-2 rounded-lg hover:bg-[#F8F8F7] ${
               customerView === 'account' ? 'text-[#FF6A00] bg-[#FFF3E6]' : ''
             }`}
             title="My Account"
           >
             <User className="w-5 h-5" />
-            <span className="hidden sm:inline">Account</span>
+            <span className="hidden sm:inline">{authUser ? authUser.displayName : 'Sign In'}</span>
+          </button>
+
+          {/* Admin Portal Entry */}
+          <button
+            onClick={() => {
+              if (authUser?.isAdmin) {
+                setActiveMode('admin');
+                setAdminView('dashboard');
+              } else {
+                setIsAdminLoginModalOpen(true);
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-700 hover:text-black hover:bg-gray-100 transition-colors border border-gray-200"
+            title="ATHARV ELECTRICAL Admin Portal"
+          >
+            <span className="w-2 h-2 rounded-full bg-[#FF6A00]" />
+            <span>Admin</span>
           </button>
 
           {/* Cart Button */}

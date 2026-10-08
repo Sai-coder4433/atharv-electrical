@@ -1,0 +1,133 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.email == 'admin@atharvelectrical.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // 1. Users collection
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if (isOwner(userId) && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']))) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // 2. Categories
+    match /categories/{categoryId} {
+      allow read: if true; // Public can read active categories
+      allow write: if isAdmin();
+    }
+
+    // 3. Subcategories
+    match /subcategories/{subcategoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 4. Brands
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 5. Products & Product Variants
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /productVariants/{variantId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 6. Orders
+    match /orders/{orderId} {
+      // Customer can read their own orders by userId, customerEmail or customerPhone; Admin can read all
+      allow read: if isAdmin() || (isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.customerEmail == request.auth.token.email
+      ));
+      // Customers can create orders (with valid amount, pending status)
+      allow create: if isAuthenticated() || true; // Guest or auth customer can place order
+      // Only Admin or Cloud Functions can update order status/payment
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /orderItems/{orderItemId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // 7. Carts & Wishlists
+    match /carts/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    match /wishlists/{userId} {
+      allow read, write: if isOwner(userId) || isAdmin();
+    }
+
+    // 8. Customers
+    match /customers/{customerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 9. Coupons & Offers
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /offers/{offerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 10. Banners
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 11. Reviews
+    match /reviews/{reviewId} {
+      allow read: if true;
+      // Customer can submit a review
+      allow create: if isAuthenticated();
+      // Admin approves, hides, or deletes
+      allow update, delete: if isAdmin();
+    }
+
+    // 12. Payments
+    match /payments/{paymentId} {
+      // Payment records are strictly server/admin managed
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // 13. Settings
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

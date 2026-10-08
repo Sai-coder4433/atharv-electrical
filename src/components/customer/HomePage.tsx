@@ -17,29 +17,29 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
     setSelectedCategory,
     setSelectedBrand,
     setCustomerView,
+    storeSettings,
   } = useApp();
 
   // Curated collections for natural discovery
-  const bestSellers = products.filter((p) => p.isBestSeller).slice(0, 4);
+  const bestSellers = products.filter((p) => p.isBestSeller || p.rating >= 4.8).slice(0, 4);
   const fansCollection = products.filter((p) => p.categoryId === 'fans').slice(0, 4);
-  const lightingCollection = products.filter((p) => p.categoryId === 'lights').slice(0, 4);
-  const switchesCollection = products
-    .filter((p) => p.categoryId === 'switches' || p.categoryId === 'wires' || p.categoryId === 'mcb')
-    .slice(0, 4);
+  const lightsCollection = products.filter((p) => p.categoryId === 'lights').slice(0, 4);
+  const switchesCollection = products.filter((p) => p.categoryId === 'switches').slice(0, 4);
+  const wiresCollection = products.filter((p) => p.categoryId === 'wires').slice(0, 4);
 
   return (
-    <div className="space-y-12 sm:space-y-16 lg:space-y-20 pb-16">
-      {/* 2. COMPACT 3-SLIDE PROMOTIONAL CAROUSEL */}
+    <div className="space-y-16 lg:space-y-24 pb-20">
+      {/* 1. COMPACT 3-SLIDE HERO CAROUSEL */}
       <section className="pt-2 sm:pt-4">
         <HeroCarousel />
       </section>
 
-      {/* 3. SHOP BY CATEGORY */}
+      {/* 2. SHOP BY CATEGORY */}
       <section>
         <QuickCategorySection />
       </section>
 
-      {/* 4. BEST SELLERS */}
+      {/* 3. BEST SELLERS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6 sm:mb-8">
           <div>
@@ -65,7 +65,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {bestSellers.map((product) => (
             <ProductCard
               key={product.id}
@@ -76,7 +76,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
         </div>
       </section>
 
-      {/* 5. FANS */}
+      {/* 4. FANS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6 sm:mb-8">
           <div>
@@ -97,12 +97,12 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             }}
             className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
           >
-            <span>View All</span>
+            <span>View All Fans</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {fansCollection.map((product) => (
             <ProductCard
               key={product.id}
@@ -113,7 +113,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
         </div>
       </section>
 
-      {/* 6. LIGHTS */}
+      {/* 5. LIGHTS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6 sm:mb-8">
           <div>
@@ -124,7 +124,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
               Lights
             </h2>
             <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Architectural slim panels, spotlights, and bright battens for every room.
+              Architectural slim panels, downlights, and bright battens for every room.
             </p>
           </div>
           <button
@@ -134,13 +134,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             }}
             className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
           >
-            <span>View All</span>
+            <span>View All Lights</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {lightingCollection.map((product) => (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {lightsCollection.map((product) => (
             <ProductCard
               key={product.id}
               product={product}
@@ -150,18 +150,18 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
         </div>
       </section>
 
-      {/* 7. SWITCHES & ELECTRICALS */}
+      {/* 6. SWITCHES & SOCKETS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6 sm:mb-8">
           <div>
             <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
-              Modular & Wiring
+              Modular Wiring
             </span>
             <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
-              Switches & Electricals
+              Switches & Sockets
             </h2>
             <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Designer modular plates, pure copper house wires, and circuit protection.
+              Designer modular switches, touch regulators, and acoustic plates.
             </p>
           </div>
           <button
@@ -171,13 +171,50 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             }}
             className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
           >
-            <span>View All</span>
+            <span>View All Switches</span>
             <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
           </button>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
           {switchesCollection.map((product) => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              onOpenDetail={onOpenProductDetail}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* 7. WIRES & CABLES */}
+      <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
+        <div className="flex items-end justify-between mb-6 sm:mb-8">
+          <div>
+            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
+              Pure Copper Safety
+            </span>
+            <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
+              Wires & Cables
+            </h2>
+            <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
+              Flame-retardant multi-strand copper house wires and industrial power cables.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setSelectedCategory('wires');
+              setCustomerView('shop');
+            }}
+            className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
+          >
+            <span>View All Wires</span>
+            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+          {wiresCollection.map((product) => (
             <ProductCard
               key={product.id}
               product={product}
@@ -261,7 +298,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
         </div>
       </section>
 
-      {/* 9. SPECIAL OFFERS */}
+      {/* 9. OFFERS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex items-end justify-between mb-6 sm:mb-8">
           <div>
@@ -314,10 +351,10 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
                 Free Delivery
               </span>
               <h3 className="font-heading text-lg sm:text-xl font-bold text-[#171717] mt-3">
-                Free Express Delivery in Pune & PCMC
+                Free Express Delivery in Chakan & Pune Area
               </h3>
               <p className="text-xs text-[#666666] mt-1">
-                All retail orders over ₹1,999 ship free directly from our Chakan warehouse.
+                All retail orders over ₹1,999 ship free directly from our Manik Chowk showroom depot.
               </p>
             </div>
             <div className="mt-5">
@@ -377,7 +414,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             </div>
             <h3 className="text-sm font-bold text-[#171717]">Easy Shopping</h3>
             <p className="text-xs text-[#666666] leading-relaxed">
-              Browse variants, select sizes, pay securely, and track delivery in seconds.
+              Browse variants, select sizes, pay securely via Razorpay, and view orders.
             </p>
           </div>
 
@@ -387,13 +424,13 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             </div>
             <h3 className="text-sm font-bold text-[#171717]">Local Store Support</h3>
             <p className="text-xs text-[#666666] leading-relaxed">
-              Visit our Chakan showroom or reach our electrician team on WhatsApp.
+              Visit our showroom at Manik Chowk, Chakan or reach our team on WhatsApp.
             </p>
           </div>
         </div>
       </section>
 
-      {/* 11. STORE LOCATION */}
+      {/* 11. STORE LOCATION (Strictly simplified: Manik Chowk, Chakan, India) */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="p-6 sm:p-10 rounded-3xl bg-white border border-[#EAEAEA] shadow-xs flex flex-col lg:flex-row items-center justify-between gap-8">
           <div className="space-y-3 max-w-xl text-center lg:text-left">
@@ -403,11 +440,9 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717]">
               ATHARV ELECTRICAL
             </h2>
-            <div className="text-xs sm:text-sm text-[#666666] leading-relaxed flex items-start gap-2 justify-center lg:justify-start">
-              <MapPin className="w-4 h-4 text-[#FF6A00] shrink-0 mt-0.5" />
-              <span>
-                Shop No. 18, Ramkrishna Complex, Opp. Indrayani Bank, Manik Chowk, Chakan, Pune, Maharashtra – 410501
-              </span>
+            <div className="text-sm font-semibold text-[#171717] leading-relaxed flex items-center gap-2 justify-center lg:justify-start">
+              <MapPin className="w-4 h-4 text-[#FF6A00] shrink-0" />
+              <span>Manik Chowk, Chakan, India</span>
             </div>
             <p className="text-xs text-[#929292]">
               Open All 7 Days: 9:30 AM to 9:00 PM · Live BLDC Fan & LED Demo Available
@@ -417,7 +452,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
           {/* Action Buttons as specified */}
           <div className="flex flex-wrap items-center justify-center gap-3">
             <a
-              href={STORE_LOCATION_DATA.googleMapsUrl}
+              href="https://maps.google.com/?q=Manik+Chowk+Chakan+India"
               target="_blank"
               rel="noreferrer"
               className="px-5 py-2.5 rounded-xl text-white font-bold text-xs bg-atharvay-gradient shadow-xs hover:shadow flex items-center gap-2"
@@ -435,7 +470,7 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
             </a>
 
             <a
-              href={`https://wa.me/${STORE_LOCATION_DATA.whatsapp}?text=Hello%20Atharv%20Electrical,%20I%20want%20to%20inquire%20about%20store%20products.`}
+              href={`https://wa.me/917720036820?text=Hello%20ATHARV%20ELECTRICAL,%20I%20want%20to%20inquire%20about%20store%20products.`}
               target="_blank"
               rel="noreferrer"
               className="px-5 py-2.5 rounded-xl bg-[#25D366] text-white font-bold text-xs shadow-xs hover:bg-[#1EBE5D] flex items-center gap-2"

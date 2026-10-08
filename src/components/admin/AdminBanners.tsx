@@ -18,10 +18,10 @@ export const AdminBanners: React.FC = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-          Homepage 3-Slide Carousel Banners
+          Homepage Carousel Banners
         </h1>
         <p className="text-xs text-gray-500 mt-0.5">
-          Configure headline copy, promotional CTAs, and active slide priority.
+          Configure headline copy, promotional CTAs, images, and active slide priority.
         </p>
       </div>
 
@@ -31,7 +31,7 @@ export const AdminBanners: React.FC = () => {
             key={banner.id}
             className="bg-white rounded-xl border border-gray-200 p-5 shadow-xs flex flex-col md:flex-row items-center gap-6"
           >
-            <div className="w-full md:w-56 aspect-video bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+            <div className="w-full md:w-56 aspect-[3/1] bg-gray-100 rounded-lg overflow-hidden border border-gray-200 shrink-0">
               <img
                 src={banner.image}
                 alt={banner.title}
@@ -40,19 +40,24 @@ export const AdminBanners: React.FC = () => {
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <span className="text-[10px] font-bold text-[#FF6A00] bg-orange-50 px-2 py-0.5 rounded">
                   Slide #{idx + 1} · {banner.brandTag}
                 </span>
                 <span className="text-[10px] text-gray-400">
                   {banner.active ? '● Active in Carousel' : '○ Disabled'}
                 </span>
+                {banner.hideTextOverlay && (
+                  <span className="text-[10px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                    Design Artwork (No Text Scrim)
+                  </span>
+                )}
               </div>
               <h3 className="font-heading font-bold text-base text-gray-900">
                 {banner.title}
               </h3>
               <p className="text-xs text-gray-600 mt-0.5">{banner.subtitle}</p>
-              <div className="mt-3 flex items-center gap-3 text-xs">
+              <div className="mt-3 flex items-center gap-3 text-xs flex-wrap">
                 <span className="font-semibold text-gray-800">
                   CTA Label: <strong>"{banner.ctaText}"</strong>
                 </span>
@@ -93,6 +98,16 @@ export const AdminBanners: React.FC = () => {
             </h3>
             <form onSubmit={handleSave} className="mt-4 space-y-3 text-xs">
               <div>
+                <label className="font-bold text-gray-900 block mb-1">Image URL</label>
+                <input
+                  type="text"
+                  value={editingBanner.image}
+                  onChange={(e) => setEditingBanner({ ...editingBanner, image: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
                 <label className="font-bold text-gray-900 block mb-1">Headline Title</label>
                 <input
                   type="text"
@@ -131,6 +146,18 @@ export const AdminBanners: React.FC = () => {
                   required
                   className="w-full px-3 py-2 border rounded-lg"
                 />
+              </div>
+              <div className="flex items-center gap-2 pt-1 pb-1">
+                <input
+                  type="checkbox"
+                  id="hideTextOverlay"
+                  checked={editingBanner.hideTextOverlay ?? false}
+                  onChange={(e) => setEditingBanner({ ...editingBanner, hideTextOverlay: e.target.checked })}
+                  className="rounded text-orange-500 focus:ring-orange-400"
+                />
+                <label htmlFor="hideTextOverlay" className="font-semibold text-gray-700 select-none cursor-pointer">
+                  Hide Text Scrim (For complete banner designs with built-in text)
+                </label>
               </div>
               <div className="pt-3 flex gap-2">
                 <button

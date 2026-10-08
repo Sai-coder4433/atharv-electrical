@@ -57,7 +57,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     Object.entries(variantGroups).forEach(([key, list]) => {
-      if (list && list.length > 0) {
+      if (list && list.length > 0 && list[0].value) {
         initial[key] = list[0].value;
       }
     });
@@ -222,9 +222,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       return (
                         <button
                           key={v.id}
-                          onClick={() =>
-                            setSelectedVariants((prev) => ({ ...prev, [groupName]: v.value }))
-                          }
+                          onClick={() => {
+                            if (v.value) {
+                              setSelectedVariants((prev) => ({ ...prev, [groupName]: v.value as string }));
+                            }
+                          }}
                           className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-all ${
                             isSelected
                               ? 'border-[#FF6A00] bg-[#FFF3E6] text-[#FF6A00] shadow-xs'

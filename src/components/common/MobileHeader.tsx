@@ -29,6 +29,11 @@ export const MobileHeader: React.FC = () => {
     setSelectedSubcategory,
     setSelectedBrand,
     deliveryPincode,
+    authUser,
+    setActiveMode,
+    setAdminView,
+    setIsAdminLoginModalOpen,
+    setIsLoginModalOpen,
   } = useApp();
 
   const [isMenuDrawerOpen, setIsMenuDrawerOpen] = useState(false);
@@ -262,7 +267,7 @@ export const MobileHeader: React.FC = () => {
                   }}
                   className="w-full text-left py-1.5 text-xs text-[#171717]"
                 >
-                  📍 Visit Our Store (Chakan, Pune)
+                  📍 Visit Our Store (Manik Chowk, Chakan, India)
                 </button>
                 <button
                   onClick={() => {
@@ -271,7 +276,21 @@ export const MobileHeader: React.FC = () => {
                   }}
                   className="w-full text-left py-1.5 text-xs text-[#171717]"
                 >
-                  📦 Track Order Status
+                  📦 My Orders
+                </button>
+                <button
+                  onClick={() => {
+                    setIsMenuDrawerOpen(false);
+                    if (authUser?.isAdmin) {
+                      setActiveMode('admin');
+                      setAdminView('dashboard');
+                    } else {
+                      setIsAdminLoginModalOpen(true);
+                    }
+                  }}
+                  className="w-full text-left py-1.5 text-xs text-[#FF6A00] font-bold"
+                >
+                  🛡️ Admin Management Portal
                 </button>
               </div>
             </div>

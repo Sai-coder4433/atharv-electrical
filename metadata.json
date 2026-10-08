@@ -1,6 +1,6 @@
 {
   "name": "ATHARV ELECTRICAL",
-  "description": "ATHARV ELECTRICAL — Premium Electrical Products, Fans, Lighting & Modular Switches in Chakan, Pune.",
+  "description": "ATHARV ELECTRICAL — Premium Electrical Products, Fans, Lighting & Modular Switches in Manik Chowk, Chakan, India.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

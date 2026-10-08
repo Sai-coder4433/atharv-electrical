@@ -149,11 +149,11 @@ export const StoreLocationView: React.FC = () => {
                 <MapPin className="w-4 h-4" />
               </div>
               <div>
-                <span className="font-bold text-[#171717] block">Address</span>
-                <p className="text-[#666666] mt-0.5 leading-relaxed">
-                  Shop No. 18, Ramkrishna Complex,<br />
-                  Opp. Indrayani Bank, Manik Chowk,<br />
-                  Chakan, Pune, Maharashtra – 410501
+                <span className="font-bold text-[#171717] block">Showroom Location</span>
+                <p className="text-[#171717] font-semibold mt-0.5 leading-relaxed text-sm">
+                  Manik Chowk,<br />
+                  Chakan,<br />
+                  India
                 </p>
               </div>
             </div>
