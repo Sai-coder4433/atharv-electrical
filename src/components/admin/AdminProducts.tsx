@@ -208,7 +208,40 @@ export const AdminProducts: React.FC = () => {
           images: [...prev.images, url],
         }));
       }
-      showToast('Image uploaded successfully to Firebase Storage', 'success');
+      showToast('Image compressed & uploaded successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const uploadMultipleFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    let successCount = 0;
+    try {
+      const urls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.type.startsWith('image/')) continue;
+        const url = await uploadToStorage(file, 'products');
+        urls.push(url);
+        successCount++;
+      }
+
+      setForm((prev) => {
+        const newImages = [...prev.images, ...urls];
+        const newMain = prev.mainImage || newImages[0] || '';
+        return {
+          ...prev,
+          mainImage: newMain,
+          images: Array.from(new Set(newImages)),
+        };
+      });
+
+      showToast(`${successCount} product image(s) compressed & uploaded!`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Image upload failed', 'error');
     } finally {
@@ -755,36 +788,174 @@ export const AdminProducts: React.FC = () => {
 
               {/* SECTION 4: Images */}
               {activeFormSection === 4 && (
-                <div className="space-y-3.5">
-                  <h4 className="font-bold text-sm text-gray-900">Section 4: Product Images (Storage)</h4>
-                  <div>
-                    <label className="block font-bold text-gray-700 mb-1">Main Image URL or Upload</label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={form.mainImage}
-                        onChange={(e) => setForm((prev) => ({ ...prev, mainImage: e.target.value }))}
-                        className="flex-1 px-3 py-2 rounded-xl border border-gray-200"
-                      />
-                      <label className="px-3 py-2 bg-gray-100 hover:bg-gray-200 font-semibold rounded-xl cursor-pointer flex items-center gap-1 shrink-0">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>Upload File</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleImageUpload(e, true)}
-                          disabled={isUploading}
-                          className="hidden"
-                        />
-                      </label>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-900">Section 4: Product Images</h4>
+                      <p className="text-xs text-gray-500">
+                        Upload high-res product photos. Auto-compressed in browser for ultra-fast loading.
+                      </p>
+                    </div>
+                    <span className="text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200/60 px-2 py-0.5 rounded-full">
+                      ⚡ 50x Fast Upload
+                    </span>
+                  </div>
+
+                  {/* Drag and Drop / Upload Zone */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (e.dataTransfer.files) {
+                        uploadMultipleFiles(e.dataTransfer.files);
+                      }
+                    }}
+                    className="border-2 border-dashed border-gray-200 hover:border-[#FF6A00] rounded-2xl p-5 text-center bg-gray-50/60 hover:bg-orange-50/20 transition-all cursor-pointer relative"
+                  >
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={(e) => {
+                        if (e.target.files) {
+                          uploadMultipleFiles(e.target.files);
+                        }
+                        e.target.value = '';
+                      }}
+                      disabled={isUploading}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-[#FF6A00] mb-2">
+                        <Upload className="w-5 h-5" />
+                      </div>
+                      <p className="font-bold text-xs text-gray-800">
+                        {isUploading ? 'Optimizing & Uploading...' : 'Click or Drag & Drop Photos Here'}
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        JPEG, PNG, WEBP · Auto-compressed to ~100KB · Select multiple files at once
+                      </p>
                     </div>
                   </div>
 
-                  {form.mainImage && (
-                    <div className="w-24 h-24 rounded-2xl border border-gray-200 p-1 bg-white">
-                      <img src={form.mainImage} alt="Main Preview" className="w-full h-full object-contain" />
+                  {/* Direct URL input option */}
+                  <div>
+                    <label className="block font-bold text-gray-700 text-xs mb-1">Or Add Image by Direct URL</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Paste image link https://..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            const val = (e.target as HTMLInputElement).value.trim();
+                            if (val) {
+                              setForm((prev) => ({
+                                ...prev,
+                                mainImage: prev.mainImage || val,
+                                images: [...prev.images, val],
+                              }));
+                              (e.target as HTMLInputElement).value = '';
+                            }
+                          }
+                        }}
+                        className="flex-1 px-3 py-2 text-xs rounded-xl border border-gray-200"
+                        id="directProductUrlInput"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const el = document.getElementById('directProductUrlInput') as HTMLInputElement;
+                          if (el && el.value.trim()) {
+                            const val = el.value.trim();
+                            setForm((prev) => ({
+                              ...prev,
+                              mainImage: prev.mainImage || val,
+                              images: [...prev.images, val],
+                            }));
+                            el.value = '';
+                          }
+                        }}
+                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-xs shrink-0"
+                      >
+                        Add URL
+                      </button>
                     </div>
-                  )}
+                  </div>
+
+                  {/* Image Gallery Grid */}
+                  <div>
+                    <label className="block font-bold text-gray-700 text-xs mb-2">
+                      Product Gallery ({form.images.length} {form.images.length === 1 ? 'image' : 'images'})
+                    </label>
+
+                    {form.images.length === 0 ? (
+                      <div className="text-center py-6 bg-white border border-gray-200 rounded-xl text-xs text-gray-400">
+                        No images uploaded yet. Upload at least one image above.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        {form.images.map((imgUrl, i) => {
+                          const isMain = form.mainImage === imgUrl;
+                          return (
+                            <div
+                              key={i}
+                              className={`relative rounded-xl border-2 p-1.5 bg-white group overflow-hidden transition-all ${
+                                isMain ? 'border-[#FF6A00] shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <div className="aspect-square w-full rounded-lg bg-gray-50 overflow-hidden flex items-center justify-center">
+                                <img
+                                  src={imgUrl}
+                                  alt={`Product angle ${i + 1}`}
+                                  className="w-full h-full object-contain"
+                                />
+                              </div>
+
+                              {/* Main Image Badge */}
+                              {isMain ? (
+                                <span className="absolute top-2.5 left-2.5 bg-[#FF6A00] text-white text-[9px] font-bold px-2 py-0.5 rounded-full shadow-xs">
+                                  ★ Main Image
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setForm((prev) => ({ ...prev, mainImage: imgUrl }))}
+                                  className="absolute top-2.5 left-2.5 bg-white/90 hover:bg-white text-gray-700 text-[9px] font-semibold px-2 py-0.5 rounded-full shadow-xs border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                                >
+                                  Set Main
+                                </button>
+                              )}
+
+                              {/* Delete button */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setForm((prev) => {
+                                    const nextImages = prev.images.filter((img) => img !== imgUrl);
+                                    const nextMain = isMain ? nextImages[0] || '' : prev.mainImage;
+                                    return {
+                                      ...prev,
+                                      mainImage: nextMain,
+                                      images: nextImages,
+                                    };
+                                  });
+                                }}
+                                className="absolute top-2.5 right-2.5 w-6 h-6 rounded-full bg-red-50 hover:bg-red-100 text-red-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs"
+                                title="Remove Image"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 

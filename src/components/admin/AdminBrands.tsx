@@ -66,6 +66,7 @@ export const AdminBrands: React.FC = () => {
       showToast(err.message || 'Logo upload failed', 'error');
     } finally {
       setUploadingLogo(false);
+      e.target.value = '';
     }
   };
 
@@ -294,6 +295,11 @@ export const AdminBrands: React.FC = () => {
                     />
                   </label>
                 </div>
+                {formData.logoUrl && (
+                  <div className="mt-2 w-16 h-16 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden p-1">
+                    <img src={formData.logoUrl} alt="Logo Preview" className="w-full h-full object-contain" />
+                  </div>
+                )}
               </div>
 
               <div>

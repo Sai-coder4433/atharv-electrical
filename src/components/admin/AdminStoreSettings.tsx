@@ -30,6 +30,7 @@ export const AdminStoreSettings: React.FC = () => {
       showToast(err.message || 'Logo upload failed', 'error');
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 

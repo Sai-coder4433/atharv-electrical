@@ -81,6 +81,7 @@ export const AdminSubcategories: React.FC = () => {
       showToast(err.message || 'Image upload failed', 'error');
     } finally {
       setUploadingImage(false);
+      e.target.value = '';
     }
   };
 
@@ -374,6 +375,11 @@ export const AdminSubcategories: React.FC = () => {
                     />
                   </label>
                 </div>
+                {formData.image && (
+                  <div className="mt-2 w-16 h-16 rounded-xl border border-gray-200 bg-gray-50 overflow-hidden p-1">
+                    <img src={formData.image} alt="Preview" className="w-full h-full object-contain" />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

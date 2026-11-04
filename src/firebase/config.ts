@@ -17,8 +17,7 @@ export const isFirebaseConfigured = (): boolean => {
   return Boolean(
     firebaseConfig.apiKey &&
     firebaseConfig.apiKey !== 'AIzaSyYourFirebaseApiKeyHere' &&
-    firebaseConfig.projectId &&
-    firebaseConfig.projectId !== 'atharv-electrical'
+    firebaseConfig.projectId
   );
 };
 

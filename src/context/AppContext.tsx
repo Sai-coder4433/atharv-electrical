@@ -62,10 +62,27 @@ import {
   recordFirestorePayment,
   fetchFirestorePayments,
   fetchFirestoreCoupons,
+  createFirestoreCoupon,
+  updateFirestoreCoupon,
+  deleteFirestoreCoupon,
+  subscribeToFirestoreCoupons,
   fetchFirestoreBanners,
+  createFirestoreBanner,
+  updateFirestoreBanner,
+  deleteFirestoreBanner,
+  subscribeToFirestoreBanners,
   fetchFirestoreReviews,
   createFirestoreReview,
   updateFirestoreReviewStatus,
+  subscribeToFirestoreReviews,
+  fetchFirestoreSettings,
+  saveFirestoreSettings,
+  subscribeToFirestoreSettings,
+  subscribeToFirestoreProducts,
+  subscribeToFirestoreCategories,
+  subscribeToFirestoreSubcategories,
+  subscribeToFirestoreBrands,
+  subscribeToFirestoreOrders,
   requestRazorpayOrder,
   verifyRazorpaySignature,
   seedInitialFirestoreData,
@@ -130,7 +147,7 @@ interface AppContextType {
   reviews: ProductReview[];
   payments: PaymentRecord[];
   storeSettings: StoreSettings;
-  updateStoreSettings: (settings: Partial<StoreSettings>) => void;
+  updateStoreSettings: (settings: Partial<StoreSettings>) => void | Promise<void>;
 
   // Cart & Wishlist
   cart: CartItem[];
@@ -189,12 +206,12 @@ interface AppContextType {
   deleteBrand: (id: string) => Promise<void>;
 
   // Admin Banner & Coupon CRUD
-  updateHeroBanner: (bannerId: string, updates: Partial<HeroBanner>) => void;
-  addHeroBanner: (banner: Omit<HeroBanner, 'id'>) => void;
-  deleteHeroBanner: (bannerId: string) => void;
-  addCoupon: (coupon: Omit<Coupon, 'id'>) => void;
-  updateCoupon: (id: string, updates: Partial<Coupon>) => void;
-  deleteCoupon: (id: string) => void;
+  updateHeroBanner: (bannerId: string, updates: Partial<HeroBanner>) => void | Promise<void>;
+  addHeroBanner: (banner: Omit<HeroBanner, 'id'>) => void | Promise<void>;
+  deleteHeroBanner: (bannerId: string) => void | Promise<void>;
+  addCoupon: (coupon: Omit<Coupon, 'id'>) => void | Promise<void>;
+  updateCoupon: (id: string, updates: Partial<Coupon>) => void | Promise<void>;
+  deleteCoupon: (id: string) => void | Promise<void>;
   moderateReview: (id: string, status: ProductReview['status']) => Promise<void>;
 
   // Toast
@@ -392,37 +409,82 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, []);
 
-  // Progressive Firestore Data Hydration
+  // Progressive Firestore Data Hydration & Live Database Synchronization
   useEffect(() => {
-    if (db) {
-      fetchFirestoreCategories().then((res) => {
-        if (res && res.length > 0) setCategories(res);
-      });
-      fetchFirestoreSubcategories().then((res) => {
-        if (res && res.length > 0) setSubcategories(res);
-      });
-      fetchFirestoreBrands().then((res) => {
-        if (res && res.length > 0) setBrands(res);
-      });
-      fetchFirestoreProducts().then((res) => {
-        if (res && res.length > 0) setProducts(res);
-      });
-      fetchFirestoreOrders().then((res) => {
-        if (res && res.length > 0) setOrders(res);
-      });
-      fetchFirestoreCoupons().then((res) => {
-        if (res && res.length > 0) setCoupons(res);
-      });
-      fetchFirestoreBanners().then((res) => {
-        if (res && res.length > 0) setHeroBanners(res);
-      });
-      fetchFirestoreReviews().then((res) => {
-        if (res && res.length > 0) setReviews(res);
-      });
-      fetchFirestorePayments().then((res) => {
-        if (res && res.length > 0) setPayments(res);
-      });
-    }
+    if (!db) return;
+
+    // 1. Initial Data Fetch
+    fetchFirestoreCategories().then((res) => {
+      if (res && res.length > 0) setCategories(res);
+    });
+    fetchFirestoreSubcategories().then((res) => {
+      if (res && res.length > 0) setSubcategories(res);
+    });
+    fetchFirestoreBrands().then((res) => {
+      if (res && res.length > 0) setBrands(res);
+    });
+    fetchFirestoreProducts().then((res) => {
+      if (res && res.length > 0) setProducts(res);
+    });
+    fetchFirestoreOrders().then((res) => {
+      if (res && res.length > 0) setOrders(res);
+    });
+    fetchFirestoreCoupons().then((res) => {
+      if (res && res.length > 0) setCoupons(res);
+    });
+    fetchFirestoreBanners().then((res) => {
+      if (res && res.length > 0) setHeroBanners(res);
+    });
+    fetchFirestoreReviews().then((res) => {
+      if (res && res.length > 0) setReviews(res);
+    });
+    fetchFirestorePayments().then((res) => {
+      if (res && res.length > 0) setPayments(res);
+    });
+    fetchFirestoreSettings().then((res) => {
+      if (res) setStoreSettings((prev) => ({ ...prev, ...res }));
+    });
+
+    // 2. Real-time Live Database Listeners
+    const unsubProducts = subscribeToFirestoreProducts((liveProds) => {
+      if (liveProds && liveProds.length > 0) setProducts(liveProds);
+    });
+    const unsubCategories = subscribeToFirestoreCategories((liveCats) => {
+      if (liveCats && liveCats.length > 0) setCategories(liveCats);
+    });
+    const unsubSub = subscribeToFirestoreSubcategories((liveSubs) => {
+      if (liveSubs && liveSubs.length > 0) setSubcategories(liveSubs);
+    });
+    const unsubBrands = subscribeToFirestoreBrands((liveBrands) => {
+      if (liveBrands && liveBrands.length > 0) setBrands(liveBrands);
+    });
+    const unsubOrders = subscribeToFirestoreOrders((liveOrders) => {
+      if (liveOrders && liveOrders.length > 0) setOrders(liveOrders);
+    });
+    const unsubBanners = subscribeToFirestoreBanners((liveBanners) => {
+      if (liveBanners && liveBanners.length > 0) setHeroBanners(liveBanners);
+    });
+    const unsubCoupons = subscribeToFirestoreCoupons((liveCoupons) => {
+      if (liveCoupons && liveCoupons.length > 0) setCoupons(liveCoupons);
+    });
+    const unsubReviews = subscribeToFirestoreReviews((liveReviews) => {
+      if (liveReviews && liveReviews.length > 0) setReviews(liveReviews);
+    });
+    const unsubSettings = subscribeToFirestoreSettings((liveSettings) => {
+      if (liveSettings) setStoreSettings((prev) => ({ ...prev, ...liveSettings }));
+    });
+
+    return () => {
+      unsubProducts();
+      unsubCategories();
+      unsubSub();
+      unsubBrands();
+      unsubOrders();
+      unsubBanners();
+      unsubCoupons();
+      unsubReviews();
+      unsubSettings();
+    };
   }, []);
 
   // Auth Functions
@@ -914,45 +976,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Admin Banner CRUD
-  const updateHeroBanner = (bannerId: string, updates: Partial<HeroBanner>) => {
+  const updateHeroBanner = async (bannerId: string, updates: Partial<HeroBanner>) => {
+    await updateFirestoreBanner(bannerId, updates);
     setHeroBanners((prev) =>
       prev.map((b) => (b.id === bannerId ? { ...b, ...updates } : b))
     );
     showToast('Hero banner updated', 'success');
   };
 
-  const addHeroBanner = (bannerData: Omit<HeroBanner, 'id'>) => {
+  const addHeroBanner = async (bannerData: Omit<HeroBanner, 'id'>) => {
+    const id = await createFirestoreBanner(bannerData);
     const newBanner: HeroBanner = {
       ...bannerData,
-      id: `banner-${Date.now()}`,
+      id,
     };
     setHeroBanners((prev) => [...prev, newBanner]);
     showToast('Hero banner added', 'success');
   };
 
-  const deleteHeroBanner = (bannerId: string) => {
+  const deleteHeroBanner = async (bannerId: string) => {
+    await deleteFirestoreBanner(bannerId);
     setHeroBanners((prev) => prev.filter((b) => b.id !== bannerId));
     showToast('Hero banner deleted', 'info');
   };
 
   // Admin Coupon CRUD
-  const addCoupon = (couponData: Omit<Coupon, 'id'>) => {
+  const addCoupon = async (couponData: Omit<Coupon, 'id'>) => {
+    const id = await createFirestoreCoupon(couponData);
     const newCoupon: Coupon = {
       ...couponData,
-      id: `coupon-${Date.now()}`,
+      id,
     };
     setCoupons((prev) => [newCoupon, ...prev]);
     showToast(`Coupon ${newCoupon.code} created`, 'success');
   };
 
-  const updateCoupon = (id: string, updates: Partial<Coupon>) => {
+  const updateCoupon = async (id: string, updates: Partial<Coupon>) => {
+    await updateFirestoreCoupon(id, updates);
     setCoupons((prev) =>
       prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
     );
     showToast('Coupon updated', 'success');
   };
 
-  const deleteCoupon = (id: string) => {
+  const deleteCoupon = async (id: string) => {
+    await deleteFirestoreCoupon(id);
     setCoupons((prev) => prev.filter((c) => c.id !== id));
     showToast('Coupon removed', 'info');
   };
@@ -966,7 +1034,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Review status updated to ${status}`, 'success');
   };
 
-  const updateStoreSettings = (newSettings: Partial<StoreSettings>) => {
+  const updateStoreSettings = async (newSettings: Partial<StoreSettings>) => {
+    await saveFirestoreSettings(newSettings);
     setStoreSettings((prev) => ({ ...prev, ...newSettings }));
     showToast('Store settings saved successfully', 'success');
   };
