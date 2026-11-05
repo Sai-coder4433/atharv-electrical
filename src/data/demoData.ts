@@ -265,9 +265,10 @@ export const PRODUCTS_DATA: Product[] = [
     status: 'active',
     isFeatured: true,
     isBestSeller: true,
+    mainImage: 'https://images.unsplash.com/photo-1595303526913-c703e631589c?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
-      '/src/assets/images/store_showroom_interior_1790620397788.jpg',
+      'https://images.unsplash.com/photo-1595303526913-c703e631589c?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_fan_bldc_1790620359971.jpg'
     ],
     variants: [
       { id: 'v1', name: 'Color', type: 'color', value: 'Caramel Brown', inStock: true },
@@ -311,8 +312,10 @@ export const PRODUCTS_DATA: Product[] = [
     lowStockThreshold: 15,
     status: 'active',
     isBestSeller: true,
+    mainImage: 'https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
+      'https://images.unsplash.com/photo-1618220179428-22790b461013?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_fan_bldc_1790620359971.jpg'
     ],
     variants: [
       { id: 'v11', name: 'Color', type: 'color', value: 'Lustre Brown', inStock: true },
@@ -352,8 +355,10 @@ export const PRODUCTS_DATA: Product[] = [
     lowStockThreshold: 8,
     status: 'active',
     isFeatured: true,
+    mainImage: '/assets/images/hero_fan_bldc_1790620359971.jpg',
     images: [
-      '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
+      '/assets/images/hero_fan_bldc_1790620359971.jpg',
+      'https://images.unsplash.com/photo-1595303526913-c703e631589c?auto=format&fit=crop&w=800&q=80'
     ],
     variants: [
       { id: 'v21', name: 'Color', type: 'color', value: 'Pure White', inStock: true },
@@ -590,8 +595,10 @@ export const PRODUCTS_DATA: Product[] = [
     lowStockThreshold: 40,
     status: 'active',
     isBestSeller: true,
+    mainImage: 'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_led_lighting_1790620372663.jpg',
+      'https://images.unsplash.com/photo-1524484485831-a92ffc0de03f?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_led_lighting_1790620372663.jpg'
     ],
     variants: [
       { id: 'v81', name: 'Length', type: 'length', value: '4 Feet (20W)', inStock: true },
@@ -667,8 +674,10 @@ export const PRODUCTS_DATA: Product[] = [
     status: 'active',
     isBestSeller: true,
     isFeatured: true,
+    mainImage: 'https://images.unsplash.com/photo-1558441719-74a9d7c3d2e9?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_switches_modular_1790620386276.jpg',
+      'https://images.unsplash.com/photo-1558441719-74a9d7c3d2e9?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_switches_modular_1790620386276.jpg'
     ],
     variants: [
       { id: 'v101', name: 'Color', type: 'color', value: 'Pure Titanium White', inStock: true },
@@ -819,8 +828,10 @@ export const PRODUCTS_DATA: Product[] = [
     status: 'active',
     isBestSeller: true,
     isFeatured: true,
+    mainImage: 'https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_switches_modular_1790620386276.jpg',
+      'https://images.unsplash.com/photo-1544724569-5f546fd6f2b5?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_switches_modular_1790620386276.jpg'
     ],
     variants: [
       { id: 'v141', name: 'Gauge', type: 'gauge', value: '1.5 sq mm (Lighting & Fans)', inStock: true },
@@ -861,8 +872,10 @@ export const PRODUCTS_DATA: Product[] = [
     stock: 40,
     lowStockThreshold: 10,
     status: 'active',
+    mainImage: 'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_switches_modular_1790620386276.jpg',
+      'https://images.unsplash.com/photo-1585338107529-13afc5f02586?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_switches_modular_1790620386276.jpg'
     ],
     variants: [
       { id: 'v151', name: 'Length', type: 'length', value: '50 Meters', inStock: true },
@@ -977,8 +990,10 @@ export const PRODUCTS_DATA: Product[] = [
     stock: 35,
     lowStockThreshold: 8,
     status: 'active',
+    mainImage: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_switches_modular_1790620386276.jpg',
+      'https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_switches_modular_1790620386276.jpg'
     ],
     variants: [
       { id: 'v181', name: 'Capacity', type: 'finish', value: '8-Way SPN (Up to 8 MCBs)', inStock: true },
@@ -1016,8 +1031,10 @@ export const PRODUCTS_DATA: Product[] = [
     lowStockThreshold: 20,
     status: 'active',
     isBestSeller: true,
+    mainImage: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
     images: [
-      '/src/assets/images/hero_switches_modular_1790620386276.jpg',
+      'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80',
+      '/assets/images/hero_switches_modular_1790620386276.jpg'
     ],
     variants: [
       { id: 'v191', name: 'Cord Length', type: 'length', value: '2 Meters Cord', inStock: true },

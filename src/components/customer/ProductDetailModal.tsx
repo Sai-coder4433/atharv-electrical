@@ -124,9 +124,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div>
               <div className="relative aspect-square bg-[#F8F8F7] rounded-2xl overflow-hidden border border-[#EAEAEA] flex items-center justify-center p-4">
                 <img
-                  src={product.images[activeImageIndex] || product.images[0]}
+                  src={
+                    (product.images && product.images[activeImageIndex]) ||
+                    product.mainImage ||
+                    (product.images && product.images[0]) ||
+                    '/assets/images/hero_fan_bldc_1790620359971.jpg'
+                  }
                   alt={product.name}
                   className="w-full h-full object-contain mix-blend-multiply"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.dataset.triedFallback) return;
+                    target.dataset.triedFallback = 'true';
+                    if (product.categoryId === 'lights') {
+                      target.src = '/assets/images/hero_led_lighting_1790620372663.jpg';
+                    } else if (product.categoryId === 'switches' || product.categoryId === 'wires' || product.categoryId === 'mcb') {
+                      target.src = '/assets/images/hero_switches_modular_1790620386276.jpg';
+                    } else {
+                      target.src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                    }
+                  }}
                 />
                 {product.discountPercentage > 0 && (
                   <div
@@ -437,9 +454,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       className="p-3 rounded-xl border border-[#EAEAEA] hover:border-[#FF6A00] cursor-pointer bg-[#F8F8F7] flex items-center gap-3"
                     >
                       <img
-                        src={rel.images[0]}
+                        src={rel.mainImage || (rel.images && rel.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                         alt={rel.name}
                         className="w-12 h-12 object-contain bg-white rounded-lg p-1 border border-[#EAEAEA]"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                        }}
                       />
                       <div className="min-w-0">
                         <p className="text-xs font-bold text-[#171717] truncate">{rel.name}</p>

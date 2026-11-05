@@ -125,9 +125,12 @@ export const OrderTrackingView: React.FC = () => {
                   <div key={idx} className="py-2.5 flex items-center justify-between text-xs gap-3">
                     <div className="flex items-center gap-3">
                       <img
-                        src={item.product.mainImage || item.product.images[0]}
+                        src={item.product.mainImage || (item.product.images && item.product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                         alt={item.product.name}
                         className="w-12 h-12 object-contain rounded-xl border p-1 bg-white shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                        }}
                       />
                       <div>
                         <p className="font-bold text-gray-900">{item.product.name}</p>

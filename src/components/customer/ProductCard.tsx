@@ -85,11 +85,20 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* 2. Product Image */}
         <div className="relative w-full aspect-square bg-[#F8F8F7] rounded-xl overflow-hidden flex items-center justify-center p-3 mb-3">
           <img
-            src={product.images[0]}
+            src={product.mainImage || (product.images && product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
             alt={product.name}
             className="w-full h-full object-contain mix-blend-multiply transform transition-transform duration-300 group-hover:scale-108"
             onError={(e) => {
-              (e.target as HTMLImageElement).src = '/src/assets/images/hero_fan_bldc_1790620359971.jpg';
+              const target = e.target as HTMLImageElement;
+              if (target.dataset.triedFallback) return;
+              target.dataset.triedFallback = 'true';
+              if (product.categoryId === 'lights') {
+                target.src = '/assets/images/hero_led_lighting_1790620372663.jpg';
+              } else if (product.categoryId === 'switches' || product.categoryId === 'wires' || product.categoryId === 'mcb') {
+                target.src = '/assets/images/hero_switches_modular_1790620386276.jpg';
+              } else {
+                target.src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+              }
             }}
           />
 

@@ -125,9 +125,12 @@ export const CartDrawer: React.FC = () => {
                 {/* Thumbnail */}
                 <div className="w-18 h-18 rounded-lg bg-[#F8F8F7] border border-[#EAEAEA] p-1.5 shrink-0 flex items-center justify-center">
                   <img
-                    src={item.product.images[0]}
+                    src={item.product.mainImage || (item.product.images && item.product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                     alt={item.product.name}
                     className="w-full h-full object-contain mix-blend-multiply"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                    }}
                   />
                 </div>
 

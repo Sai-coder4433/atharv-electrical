@@ -93,8 +93,8 @@ export const AdminProducts: React.FC = () => {
     gst: 18,
     stock: 25,
     lowStockThreshold: 5,
-    mainImage: '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
-    images: ['/src/assets/images/hero_fan_bldc_1790620359971.jpg'],
+    mainImage: '',
+    images: [],
     shortDescription: '',
     description: '',
     specifications: [
@@ -136,8 +136,8 @@ export const AdminProducts: React.FC = () => {
       gst: 18,
       stock: 20,
       lowStockThreshold: 5,
-      mainImage: '/src/assets/images/hero_fan_bldc_1790620359971.jpg',
-      images: ['/src/assets/images/hero_fan_bldc_1790620359971.jpg'],
+      mainImage: '',
+      images: [],
       shortDescription: '',
       description: '',
       specifications: [
@@ -232,8 +232,13 @@ export const AdminProducts: React.FC = () => {
       }
 
       setForm((prev) => {
-        const newImages = [...prev.images, ...urls];
-        const newMain = prev.mainImage || newImages[0] || '';
+        const isPlaceholder = (img: string) =>
+          img.includes('hero_fan_bldc') ||
+          img.includes('hero_led') ||
+          img.includes('hero_switches');
+        const cleanExisting = prev.images.filter((img) => !isPlaceholder(img));
+        const newImages = [...cleanExisting, ...urls];
+        const newMain = urls[0] || (prev.mainImage && !isPlaceholder(prev.mainImage) ? prev.mainImage : newImages[0]) || '';
         return {
           ...prev,
           mainImage: newMain,
@@ -264,6 +269,14 @@ export const AdminProducts: React.FC = () => {
 
     const slug = form.slug.trim() || form.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
+    const finalMain = form.mainImage || (form.images && form.images[0]) || '';
+    let defaultFallback = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+    if (form.categoryId === 'lights') defaultFallback = '/assets/images/hero_led_lighting_1790620372663.jpg';
+    else if (form.categoryId === 'switches' || form.categoryId === 'wires' || form.categoryId === 'mcb') defaultFallback = '/assets/images/hero_switches_modular_1790620386276.jpg';
+
+    const finalMainImage = finalMain || defaultFallback;
+    const finalImages = form.images.length > 0 ? form.images : [finalMainImage];
+
     const productPayload = {
       name: form.name,
       slug,
@@ -281,8 +294,8 @@ export const AdminProducts: React.FC = () => {
       stock: Number(form.stock),
       lowStockThreshold: Number(form.lowStockThreshold),
       status: (Number(form.stock) === 0 ? 'out_of_stock' : form.status) as any,
-      mainImage: form.mainImage,
-      images: form.images.length > 0 ? form.images : [form.mainImage],
+      mainImage: finalMainImage,
+      images: finalImages,
       specifications: specRecord,
       warranty: form.warranty,
       variants: form.enableVariants ? form.variants : [],
@@ -467,9 +480,12 @@ export const AdminProducts: React.FC = () => {
                     <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
                       <td className="py-3 px-4">
                         <img
-                          src={p.mainImage || p.images[0]}
+                          src={p.mainImage || (p.images && p.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                           alt={p.name}
                           className="w-12 h-12 object-contain rounded-xl border border-gray-200 p-1 bg-white shrink-0"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                          }}
                         />
                       </td>
                       <td className="py-3 px-4 max-w-xs">
@@ -1264,9 +1280,12 @@ export const AdminProducts: React.FC = () => {
 
             <div className="mt-4 flex items-center gap-4">
               <img
-                src={viewingProduct.mainImage || viewingProduct.images[0]}
+                src={viewingProduct.mainImage || (viewingProduct.images && viewingProduct.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                 alt={viewingProduct.name}
                 className="w-20 h-20 object-contain rounded-2xl border p-1 bg-white shrink-0"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                }}
               />
               <div>
                 <span className="text-[10px] uppercase font-bold text-[#FF6A00] bg-orange-50 px-2 py-0.5 rounded">

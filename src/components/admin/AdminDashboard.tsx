@@ -258,9 +258,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                 <div key={p.id} className="p-3 bg-gray-50 rounded-2xl flex items-center justify-between gap-3 text-xs">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <img
-                      src={p.mainImage || p.images[0]}
+                      src={p.mainImage || (p.images && p.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                       alt={p.name}
                       className="w-9 h-9 object-contain rounded-lg border bg-white p-0.5 shrink-0"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                      }}
                     />
                     <div className="min-w-0">
                       <p className="font-bold text-gray-900 truncate">{p.name}</p>
@@ -297,9 +300,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
               <div key={p.id} className="p-3 border border-gray-100 rounded-2xl flex items-center justify-between text-xs">
                 <div className="flex items-center gap-3">
                   <img
-                    src={p.mainImage || p.images[0]}
+                    src={p.mainImage || (p.images && p.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                     alt={p.name}
                     className="w-10 h-10 object-contain rounded-xl border p-1 bg-white shrink-0"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                    }}
                   />
                   <div>
                     <span className="text-[10px] font-bold text-[#FF6A00] uppercase">{p.brand}</span>

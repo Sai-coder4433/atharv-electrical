@@ -214,9 +214,12 @@ export const CustomerAccountView: React.FC = () => {
                     <div key={it.id} className="py-2 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-3">
                         <img
-                          src={it.product.images[0]}
+                          src={it.product.mainImage || (it.product.images && it.product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                           alt={it.product.name}
                           className="w-10 h-10 object-cover rounded bg-[#F8F8F7] border border-[#EAEAEA]"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                          }}
                         />
                         <div>
                           <p className="font-semibold text-[#171717] line-clamp-1">{it.product.name}</p>

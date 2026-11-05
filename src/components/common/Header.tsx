@@ -358,9 +358,12 @@ export const Header: React.FC = () => {
                         className="px-3 py-2 flex items-center gap-2.5 hover:bg-[#FFF3E6]/40 cursor-pointer"
                       >
                         <img
-                          src={prod.images[0]}
+                          src={prod.mainImage || (prod.images && prod.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
                           alt={prod.name}
                           className="w-8 h-8 object-cover rounded border border-[#EAEAEA]"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-[#171717] truncate">{prod.name}</p>
