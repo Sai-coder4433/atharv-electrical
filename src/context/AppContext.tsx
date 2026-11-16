@@ -16,6 +16,9 @@ import {
   Brand,
   StoreSettings,
   AuthUser,
+  ShipmentRecord,
+  ShipmentStatus,
+  ShiprocketCourierRate,
 } from '../types';
 import {
   PRODUCTS_DATA,
@@ -86,6 +89,16 @@ import {
   requestRazorpayOrder,
   verifyRazorpaySignature,
   seedInitialFirestoreData,
+  fetchFirestoreShipments,
+  subscribeToFirestoreShipments,
+  checkShiprocketServiceability,
+  createShiprocketShipment,
+  generateShiprocketAwb,
+  scheduleShiprocketPickup,
+  generateShiprocketLabel,
+  cancelShiprocketShipment,
+  trackShiprocketShipment,
+  saveShiprocketConfig,
 } from '../firebase/services';
 
 interface Toast {
@@ -213,6 +226,28 @@ interface AppContextType {
   updateCoupon: (id: string, updates: Partial<Coupon>) => void | Promise<void>;
   deleteCoupon: (id: string) => void | Promise<void>;
   moderateReview: (id: string, status: ProductReview['status']) => Promise<void>;
+
+  // Admin Shipping & Shiprocket Management
+  shipments: ShipmentRecord[];
+  createShipmentForOrder: (
+    orderId: string,
+    packageDetails: {
+      weight: number;
+      dimensions: { length: number; breadth: number; height: number };
+      courierId?: number | string;
+      shippingCharge?: number;
+    }
+  ) => Promise<ShipmentRecord | null>;
+  generateAwbForShipment: (shipmentDocId: string, courierId?: number | string) => Promise<boolean>;
+  schedulePickupForShipment: (shipmentDocId: string, pickupDate?: string) => Promise<boolean>;
+  generateLabelForShipment: (shipmentDocId: string) => Promise<string | null>;
+  cancelShipment: (shipmentDocId: string) => Promise<boolean>;
+  refreshShipmentTracking: (awbCode: string, shipmentDocId?: string) => Promise<void>;
+  checkShippingRates: (
+    deliveryPincode: string,
+    weight?: number,
+    dimensions?: { length: number; breadth: number; height: number }
+  ) => Promise<ShiprocketCourierRate[]>;
 
   // Toast
   toasts: Toast[];
@@ -354,6 +389,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [reviews, setReviews] = useState<ProductReview[]>(DEMO_REVIEWS);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [shipments, setShipments] = useState<ShipmentRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('ae_shipments');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const [cart, setCart] = useState<CartItem[]>(() => {
     try {
@@ -386,10 +429,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem('ae_coupons', JSON.stringify(coupons));
       localStorage.setItem('ae_banners', JSON.stringify(heroBanners));
       localStorage.setItem('ae_settings', JSON.stringify(storeSettings));
+      localStorage.setItem('ae_shipments', JSON.stringify(shipments));
     } catch (e) {
       console.warn('Storage sync warn', e);
     }
-  }, [products, categories, subcategories, brands, orders, cart, wishlist, coupons, heroBanners, storeSettings]);
+  }, [products, categories, subcategories, brands, orders, cart, wishlist, coupons, heroBanners, storeSettings, shipments]);
 
   // Toast notifier
   const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -444,6 +488,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchFirestoreSettings().then((res) => {
       if (res) setStoreSettings((prev) => ({ ...prev, ...res }));
     });
+    fetchFirestoreShipments().then((res) => {
+      if (res && res.length > 0) setShipments(res);
+    });
 
     // 2. Real-time Live Database Listeners
     const unsubProducts = subscribeToFirestoreProducts((liveProds) => {
@@ -473,6 +520,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubSettings = subscribeToFirestoreSettings((liveSettings) => {
       if (liveSettings) setStoreSettings((prev) => ({ ...prev, ...liveSettings }));
     });
+    const unsubShipments = subscribeToFirestoreShipments((liveShipments) => {
+      if (liveShipments && liveShipments.length > 0) setShipments(liveShipments);
+    });
 
     return () => {
       unsubProducts();
@@ -484,6 +534,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubCoupons();
       unsubReviews();
       unsubSettings();
+      unsubShipments();
     };
   }, []);
 
@@ -864,40 +915,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Admin Product CRUD
   const addProduct = async (newProdData: Omit<Product, 'id' | 'createdAt'>) => {
-    const docId = await createFirestoreProduct(newProdData);
-    const newProd: Product = {
-      ...newProdData,
-      id: docId,
-      createdAt: new Date().toISOString(),
-    };
-    setProducts((prev) => [newProd, ...prev]);
-    showToast(`Product "${newProd.name}" added to inventory!`, 'success');
+    try {
+      const docId = await createFirestoreProduct(newProdData);
+      const newProd: Product = {
+        ...newProdData,
+        id: docId,
+        productId: docId,
+        createdAt: new Date().toISOString(),
+      };
+      setProducts((prev) => [newProd, ...prev.filter((p) => p.id !== docId)]);
+      showToast(`Product "${newProd.name}" saved to Firestore successfully!`, 'success');
+    } catch (err: any) {
+      console.error('Failed to save product to Firestore:', err);
+      showToast(`Firebase write error: ${err.message || 'Write failed'}`, 'error');
+      throw err;
+    }
   };
 
   const updateProduct = async (id: string, updates: Partial<Product>) => {
-    await updateFirestoreProduct(id, updates);
-    setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-    );
-    showToast('Product updated successfully.', 'success');
+    try {
+      await updateFirestoreProduct(id, updates);
+      setProducts((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
+      );
+      showToast('Product updated successfully in Firestore.', 'success');
+    } catch (err: any) {
+      console.error('Failed to update product in Firestore:', err);
+      showToast(`Firebase update error: ${err.message || 'Update failed'}`, 'error');
+      throw err;
+    }
   };
 
   const deleteProduct = async (id: string) => {
-    await deleteFirestoreProduct(id);
-    setProducts((prev) => prev.filter((p) => p.id !== id));
-    showToast('Product removed from catalog.', 'info');
+    try {
+      await deleteFirestoreProduct(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+      showToast('Product deleted from Firestore catalog.', 'info');
+    } catch (err: any) {
+      console.error('Failed to delete product from Firestore:', err);
+      showToast(`Firebase delete error: ${err.message || 'Delete failed'}`, 'error');
+      throw err;
+    }
   };
 
-  const duplicateProduct = (id: string) => {
+  const duplicateProduct = async (id: string) => {
     const prod = products.find((p) => p.id === id);
     if (!prod) return;
     const duplicated: Omit<Product, 'id' | 'createdAt'> = {
       ...prod,
       name: `${prod.name} (Copy)`,
-      sku: `${prod.sku}-COPY`,
-      slug: `${prod.slug}-copy`,
+      sku: `${prod.sku}-COPY-${Math.floor(100 + Math.random() * 900)}`,
+      slug: `${prod.slug}-copy-${Date.now().toString().slice(-4)}`,
     };
-    addProduct(duplicated);
+    await addProduct(duplicated);
   };
 
   const updateInventoryStock = async (productId: string, newStock: number) => {
@@ -911,46 +981,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Admin Category CRUD
   const addCategory = async (cat: Omit<Category, 'id'>) => {
-    const id = await createFirestoreCategory(cat);
-    const newCat: Category = { ...cat, id };
-    setCategories((prev) => [...prev, newCat]);
-    showToast(`Category "${newCat.name}" added!`, 'success');
+    try {
+      const id = await createFirestoreCategory(cat);
+      const newCat: Category = {
+        ...cat,
+        id,
+        imageUrl: cat.imageUrl || cat.image || '',
+        image: cat.image || cat.imageUrl || '',
+      };
+      setCategories((prev) => [...prev, newCat]);
+      showToast(`Category "${newCat.name}" added to Firebase!`, 'success');
+    } catch (err: any) {
+      showToast(`Failed to add category: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   const updateCategory = async (id: string, updates: Partial<Category>) => {
-    await updateFirestoreCategory(id, updates);
-    setCategories((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
-    );
-    showToast('Category updated.', 'success');
+    try {
+      await updateFirestoreCategory(id, updates);
+      setCategories((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
+      );
+      showToast('Category updated in Firebase.', 'success');
+    } catch (err: any) {
+      showToast(`Failed to update category: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   const deleteCategory = async (id: string) => {
-    await deleteFirestoreCategory(id);
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-    showToast('Category deleted.', 'info');
+    try {
+      const linkedProds = products.filter((p) => p.categoryId === id);
+      const linkedSubs = subcategories.filter((s) => s.categoryId === id);
+      if (linkedProds.length > 0) {
+        showToast(`Reassigned ${linkedProds.length} products to general category`, 'info');
+      }
+      await deleteFirestoreCategory(id);
+      setCategories((prev) => prev.filter((c) => c.id !== id));
+      if (linkedSubs.length > 0) {
+        setSubcategories((prev) => prev.filter((s) => s.categoryId !== id));
+      }
+      showToast('Category removed from Firebase.', 'info');
+    } catch (err: any) {
+      showToast(`Failed to delete category: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   // Admin Subcategory CRUD
   const addSubcategory = async (sub: Omit<SubcategoryItem, 'id'>) => {
-    const id = await createFirestoreSubcategory(sub);
-    const newSub: SubcategoryItem = { ...sub, id };
-    setSubcategories((prev) => [...prev, newSub]);
-    showToast(`Subcategory "${newSub.name}" added!`, 'success');
+    try {
+      const id = await createFirestoreSubcategory(sub);
+      const newSub: SubcategoryItem = { ...sub, id };
+      setSubcategories((prev) => [...prev, newSub]);
+      showToast(`Subcategory "${newSub.name}" added to Firebase!`, 'success');
+    } catch (err: any) {
+      showToast(`Failed to add subcategory: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   const updateSubcategory = async (id: string, updates: Partial<SubcategoryItem>) => {
-    await updateFirestoreSubcategory(id, updates);
-    setSubcategories((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
-    );
-    showToast('Subcategory updated.', 'success');
+    try {
+      await updateFirestoreSubcategory(id, updates);
+      setSubcategories((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+      );
+      showToast('Subcategory updated in Firebase.', 'success');
+    } catch (err: any) {
+      showToast(`Failed to update subcategory: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   const deleteSubcategory = async (id: string) => {
-    await deleteFirestoreSubcategory(id);
-    setSubcategories((prev) => prev.filter((s) => s.id !== id));
-    showToast('Subcategory deleted.', 'info');
+    try {
+      await deleteFirestoreSubcategory(id);
+      setSubcategories((prev) => prev.filter((s) => s.id !== id));
+      showToast('Subcategory deleted from Firebase.', 'info');
+    } catch (err: any) {
+      showToast(`Failed to delete subcategory: ${err.message}`, 'error');
+      throw err;
+    }
   };
 
   // Admin Brand CRUD
@@ -1040,6 +1153,177 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Store settings saved successfully', 'success');
   };
 
+  // Shiprocket Shipping Methods
+  const checkShippingRates = async (
+    deliveryPincode: string,
+    weight?: number,
+    dimensions?: { length: number; breadth: number; height: number }
+  ): Promise<ShiprocketCourierRate[]> => {
+    const res = await checkShiprocketServiceability({
+      deliveryPincode,
+      weight,
+      length: dimensions?.length,
+      breadth: dimensions?.breadth,
+      height: dimensions?.height,
+    });
+    if (res.success && res.availableCouriers) {
+      if (res.isSandboxMode) {
+        showToast(res.message || 'Regional shipping rates calculated', 'info');
+      }
+      return res.availableCouriers;
+    }
+    showToast(res.error || 'Courier rates unavailable for this pincode', 'error');
+    return [];
+  };
+
+  const createShipmentForOrder = async (
+    orderId: string,
+    packageDetails: {
+      weight: number;
+      dimensions: { length: number; breadth: number; height: number };
+      courierId?: number | string;
+      shippingCharge?: number;
+    }
+  ): Promise<ShipmentRecord | null> => {
+    try {
+      const res = await createShiprocketShipment({
+        orderId,
+        packageWeight: packageDetails.weight,
+        packageDimensions: packageDetails.dimensions,
+        courierId: packageDetails.courierId,
+        shippingCharge: packageDetails.shippingCharge,
+      });
+
+      if (res.success && res.shipment) {
+        showToast('Shipment created and registered with Shiprocket!', 'success');
+        setShipments((prev) => [res.shipment!, ...prev.filter((s) => s.id !== res.shipment!.id)]);
+        setOrders((prev) =>
+          prev.map((o) =>
+            o.id === orderId
+              ? { ...o, shipmentId: res.shipment!.id, shippingStatus: 'Shipment Booked', status: 'Processing' }
+              : o
+          )
+        );
+        return res.shipment;
+      }
+      showToast(res.error || 'Failed to create shipment', 'error');
+      return null;
+    } catch (err: any) {
+      showToast(`Shipment error: ${err.message}`, 'error');
+      return null;
+    }
+  };
+
+  const generateAwbForShipment = async (shipmentDocId: string, courierId?: number | string): Promise<boolean> => {
+    try {
+      const res = await generateShiprocketAwb(shipmentDocId, courierId);
+      if (res.success) {
+        showToast(`AWB ${res.awbCode} generated successfully!`, 'success');
+        setShipments((prev) =>
+          prev.map((s) =>
+            s.id === shipmentDocId
+              ? {
+                  ...s,
+                  awbCode: res.awbCode,
+                  courierName: res.courierName,
+                  trackingUrl: res.trackingUrl,
+                  shipmentStatus: 'Shipment Booked',
+                }
+              : s
+          )
+        );
+        return true;
+      }
+      showToast(res.error || 'Failed to generate AWB', 'error');
+      return false;
+    } catch (err: any) {
+      showToast(`AWB error: ${err.message}`, 'error');
+      return false;
+    }
+  };
+
+  const schedulePickupForShipment = async (shipmentDocId: string, pickupDate?: string): Promise<boolean> => {
+    try {
+      const res = await scheduleShiprocketPickup(shipmentDocId, pickupDate);
+      if (res.success) {
+        showToast(`Pickup scheduled for ${res.pickupScheduledDate}!`, 'success');
+        setShipments((prev) =>
+          prev.map((s) =>
+            s.id === shipmentDocId
+              ? {
+                  ...s,
+                  pickupStatus: 'Scheduled',
+                  shipmentStatus: 'Pickup Scheduled',
+                  pickupScheduledDate: res.pickupScheduledDate,
+                  pickupToken: res.pickupToken,
+                }
+              : s
+          )
+        );
+        return true;
+      }
+      showToast(res.error || 'Failed to schedule pickup', 'error');
+      return false;
+    } catch (err: any) {
+      showToast(`Pickup error: ${err.message}`, 'error');
+      return false;
+    }
+  };
+
+  const generateLabelForShipment = async (shipmentDocId: string): Promise<string | null> => {
+    try {
+      const res = await generateShiprocketLabel(shipmentDocId);
+      if (res.success && res.labelUrl) {
+        showToast('Shipping label generated!', 'success');
+        setShipments((prev) =>
+          prev.map((s) =>
+            s.id === shipmentDocId ? { ...s, labelUrl: res.labelUrl, manifestUrl: res.manifestUrl } : s
+          )
+        );
+        return res.labelUrl;
+      }
+      showToast(res.error || 'Failed to generate label', 'error');
+      return null;
+    } catch (err: any) {
+      showToast(`Label error: ${err.message}`, 'error');
+      return null;
+    }
+  };
+
+  const cancelShipment = async (shipmentDocId: string): Promise<boolean> => {
+    try {
+      const res = await cancelShiprocketShipment(shipmentDocId);
+      if (res.success) {
+        showToast('Shipment cancelled successfully.', 'info');
+        setShipments((prev) =>
+          prev.map((s) => (s.id === shipmentDocId ? { ...s, shipmentStatus: 'Cancelled' } : s))
+        );
+        return true;
+      }
+      showToast(res.error || 'Failed to cancel shipment', 'error');
+      return false;
+    } catch (err: any) {
+      showToast(`Cancellation error: ${err.message}`, 'error');
+      return false;
+    }
+  };
+
+  const refreshShipmentTracking = async (awbCode: string, shipmentDocId?: string): Promise<void> => {
+    try {
+      const res = await trackShiprocketShipment(awbCode, shipmentDocId);
+      if (res.success && res.status) {
+        showToast(`Shipment status: ${res.status}`, 'info');
+        if (shipmentDocId) {
+          setShipments((prev) =>
+            prev.map((s) => (s.id === shipmentDocId ? { ...s, shipmentStatus: res.status as ShipmentStatus } : s))
+          );
+        }
+      }
+    } catch (err: any) {
+      showToast(`Tracking refresh failed: ${err.message}`, 'error');
+    }
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1083,8 +1367,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         heroBanners,
         reviews,
         payments,
+        shipments,
         storeSettings,
         updateStoreSettings,
+        createShipmentForOrder,
+        generateAwbForShipment,
+        schedulePickupForShipment,
+        generateLabelForShipment,
+        cancelShipment,
+        refreshShipmentTracking,
+        checkShippingRates,
         cart,
         wishlist,
         appliedCoupon,

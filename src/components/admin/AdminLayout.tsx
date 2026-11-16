@@ -18,6 +18,7 @@ import {
   ArrowLeft,
   ExternalLink,
   LogOut,
+  Truck,
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
@@ -35,6 +36,7 @@ import { AdminReviews } from './AdminReviews';
 import { AdminPayments } from './AdminPayments';
 import { AdminStoreSettings } from './AdminStoreSettings';
 import { AdminSettings } from './AdminSettings';
+import { AdminShipping } from './AdminShipping';
 
 export const AdminLayout: React.FC = () => {
   const {
@@ -44,6 +46,7 @@ export const AdminLayout: React.FC = () => {
     setCustomerView,
     orders,
     products,
+    shipments,
     authUser,
     logout,
   } = useApp();
@@ -75,6 +78,13 @@ export const AdminLayout: React.FC = () => {
       icon: ShoppingBag,
       badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined,
       badgeColor: 'bg-orange-500 text-white',
+    },
+    {
+      id: 'shipping',
+      label: 'Shipping',
+      icon: Truck,
+      badge: shipments.filter((s) => s.pickupStatus === 'Pending' && s.shipmentStatus !== 'Cancelled').length || undefined,
+      badgeColor: 'bg-blue-600 text-white',
     },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'coupons', label: 'Coupons', icon: Tag },
@@ -241,6 +251,7 @@ export const AdminLayout: React.FC = () => {
           {adminView === 'brands' && <AdminBrands />}
           {adminView === 'inventory' && <AdminInventory />}
           {adminView === 'orders' && <AdminOrders />}
+          {adminView === 'shipping' && <AdminShipping />}
           {adminView === 'customers' && <AdminCustomers />}
           {adminView === 'coupons' && <AdminCoupons />}
           {adminView === 'offers' && <AdminCoupons />}

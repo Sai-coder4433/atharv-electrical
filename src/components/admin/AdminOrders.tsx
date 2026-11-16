@@ -10,12 +10,13 @@ import {
   MapPin,
   Store,
   DollarSign,
+  Truck,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
 
 export const AdminOrders: React.FC = () => {
-  const { orders, updateOrderStatus, storeSettings } = useApp();
+  const { orders, updateOrderStatus, storeSettings, setAdminView } = useApp();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -288,6 +289,36 @@ export const AdminOrders: React.FC = () => {
               <span>
                 Fulfilling Store Location: <strong>Manik Chowk, Chakan, India</strong>
               </span>
+            </div>
+
+            {/* Shiprocket Logistics Section */}
+            <div className="p-3.5 bg-gray-50 rounded-2xl border border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-orange-100 text-[#FF6A00] flex items-center justify-center shrink-0">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900">
+                    Shipment Status:{' '}
+                    <span className="text-[#FF6A00]">{selectedOrder.shippingStatus || 'Not Booked'}</span>
+                  </p>
+                  {selectedOrder.awbCode ? (
+                    <p className="text-[11px] text-gray-500 font-mono">AWB: {selectedOrder.awbCode} ({selectedOrder.courierPartner})</p>
+                  ) : (
+                    <p className="text-[11px] text-gray-400">Shipment has not been booked with Shiprocket yet</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setAdminView('shipping');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-gray-900 hover:bg-black text-white font-bold text-[11px] flex items-center gap-1.5 shrink-0"
+              >
+                <Truck className="w-3 h-3" />
+                <span>{selectedOrder.awbCode ? 'Track in Shipping' : 'Book in Shipping'}</span>
+              </button>
             </div>
 
             {/* Order Items (Product, Variant, Quantity, Price) */}

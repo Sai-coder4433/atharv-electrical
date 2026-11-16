@@ -55,6 +55,7 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
+  productId?: string;
   name: string;
   slug: string;
   sku: string;
@@ -75,7 +76,8 @@ export interface Product {
   reviewCount: number;
   stock: number;
   lowStockThreshold: number;
-  status: 'active' | 'draft' | 'out_of_stock' | 'Active' | 'Draft' | 'Out of Stock';
+  status?: 'active' | 'draft' | 'out_of_stock' | 'Active' | 'Draft' | 'Out of Stock';
+  isActive?: boolean;
   isFeatured?: boolean;
   isBestSeller?: boolean;
   mainImage?: string;
@@ -84,11 +86,11 @@ export interface Product {
   specifications: Record<string, string>;
   warranty: string;
   whatsInTheBox?: string;
-  tags: string[];
+  tags?: string[];
   seoTitle?: string;
   seoDescription?: string;
   createdAt: string;
-  updatedAt?: string;
+  updatedAt?: any;
 }
 
 export interface CartItem {
@@ -153,9 +155,90 @@ export interface Order {
   razorpayPaymentId?: string;
   courierPartner?: string;
   trackingNumber?: string;
+  shipmentId?: string;
+  awbCode?: string;
+  trackingUrl?: string;
+  shippingStatus?: ShipmentStatus;
   createdAt: string;
   updatedAt?: string;
   estimatedDelivery?: string;
+}
+
+export type ShipmentStatus =
+  | 'Shipment Booked'
+  | 'Pickup Scheduled'
+  | 'Picked Up'
+  | 'In Transit'
+  | 'Out for Delivery'
+  | 'Delivered'
+  | 'Undelivered'
+  | 'RTO'
+  | 'Cancelled';
+
+export type PickupStatus = 'Pending' | 'Scheduled' | 'Picked Up' | 'Failed';
+
+export interface ShipmentRecord {
+  id: string; // Document ID
+  internalOrderId: string;
+  orderNumber: string;
+  shiprocketOrderId?: number | string;
+  shiprocketShipmentId?: number | string;
+  awbCode?: string;
+  courierName?: string;
+  courierId?: number | string;
+  pickupLocation: string;
+  deliveryPincode: string;
+  pickupPincode: string;
+  packageWeight: number; // in kg
+  packageDimensions: {
+    length: number; // in cm
+    breadth: number;
+    height: number;
+  };
+  shippingCharge: number;
+  labelUrl?: string;
+  manifestUrl?: string;
+  shipmentStatus: ShipmentStatus;
+  pickupStatus: PickupStatus;
+  pickupScheduledDate?: string;
+  pickupToken?: string;
+  trackingUrl?: string;
+  history?: Array<{
+    date: string;
+    status: string;
+    activity: string;
+    location: string;
+  }>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface ShiprocketCourierRate {
+  courier_company_id: number;
+  courier_name: string;
+  rate: number;
+  etd: string;
+  rating: number;
+  cod: number;
+}
+
+export interface ShiprocketPickupAddress {
+  nickname: string;
+  contactPerson: string;
+  phone: string;
+  email: string;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface ShiprocketConfig {
+  email?: string;
+  password?: string;
+  isEnabled?: boolean;
+  isSandbox?: boolean;
 }
 
 export interface PaymentRecord {
@@ -231,7 +314,7 @@ export interface ProductReview {
 export interface StoreSettings {
   storeName: string;
   tagline?: string;
-  location: string;
+  location: string; // Customer-facing showroom location: "Manik Chowk, Chakan, India"
   phone: string;
   whatsapp: string;
   email: string;
@@ -243,6 +326,8 @@ export interface StoreSettings {
     instagram?: string;
     youtube?: string;
   };
+  shiprocketPickup?: ShiprocketPickupAddress;
+  shiprocketConfig?: ShiprocketConfig;
 }
 
 export interface AuthUser {

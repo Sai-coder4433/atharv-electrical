@@ -195,7 +195,8 @@ export const AdminProducts: React.FC = () => {
     if (!file) return;
     setIsUploading(true);
     try {
-      const url = await uploadToStorage(file, 'products');
+      const targetFolder = editingProduct ? `products/${editingProduct.id}` : 'products';
+    const url = await uploadToStorage(file, targetFolder);
       if (isMain) {
         setForm((prev) => ({
           ...prev,
@@ -226,7 +227,8 @@ export const AdminProducts: React.FC = () => {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         if (!file.type.startsWith('image/')) continue;
-        const url = await uploadToStorage(file, 'products');
+        const targetFolder = editingProduct ? `products/${editingProduct.id}` : 'products';
+    const url = await uploadToStorage(file, targetFolder);
         urls.push(url);
         successCount++;
       }
@@ -262,6 +264,15 @@ export const AdminProducts: React.FC = () => {
     }
 
     const catObj = categories.find((c) => c.id === form.categoryId);
+    const subObj = subcategories.find(
+      (s) =>
+        s.name.toLowerCase() === form.subcategory.toLowerCase() ||
+        (s.categoryId === form.categoryId && s.name.toLowerCase().includes(form.subcategory.toLowerCase()))
+    );
+    const brandObj = brands.find(
+      (b) => b.name.toLowerCase() === form.brand.toLowerCase() || b.slug === form.brand.toLowerCase()
+    );
+
     const specRecord: Record<string, string> = {};
     form.specifications.forEach((s) => {
       if (s.key.trim()) specRecord[s.key.trim()] = s.value;
@@ -277,14 +288,18 @@ export const AdminProducts: React.FC = () => {
     const finalMainImage = finalMain || defaultFallback;
     const finalImages = form.images.length > 0 ? form.images : [finalMainImage];
 
+    const isProductActive = form.status === 'active' && Number(form.stock) > 0;
+
     const productPayload = {
       name: form.name,
       slug,
       sku: form.sku,
       brand: form.brand,
+      brandId: brandObj ? brandObj.id : form.brand.toLowerCase(),
       categoryId: form.categoryId,
       categoryName: catObj ? catObj.name : 'General',
       subcategory: form.subcategory,
+      subcategoryId: subObj ? subObj.id : form.subcategory.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
       description: form.description || form.shortDescription,
       shortDescription: form.shortDescription,
       mrp: Number(form.mrp),
@@ -294,6 +309,7 @@ export const AdminProducts: React.FC = () => {
       stock: Number(form.stock),
       lowStockThreshold: Number(form.lowStockThreshold),
       status: (Number(form.stock) === 0 ? 'out_of_stock' : form.status) as any,
+      isActive: isProductActive,
       mainImage: finalMainImage,
       images: finalImages,
       specifications: specRecord,
@@ -306,13 +322,20 @@ export const AdminProducts: React.FC = () => {
       tags: [form.brand, form.subcategory, catObj?.name || ''].filter(Boolean),
     };
 
-    if (editingProduct) {
-      await updateProduct(editingProduct.id, productPayload);
-    } else {
-      await addProduct(productPayload);
+    try {
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, {
+          ...productPayload,
+          productId: editingProduct.productId || editingProduct.id,
+        });
+      } else {
+        await addProduct(productPayload);
+      }
+      setIsFormOpen(false);
+    } catch (saveErr: any) {
+      console.error('Error saving product in AdminProducts:', saveErr);
+      showToast(saveErr.message || 'Failed to save product to Firebase Firestore', 'error');
     }
-
-    setIsFormOpen(false);
   };
 
   // Filtered Products

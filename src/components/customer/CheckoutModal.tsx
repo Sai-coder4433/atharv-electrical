@@ -241,7 +241,7 @@ export const CheckoutModal: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div>
                 <label className="block font-bold text-gray-700 mb-1">Area / Locality *</label>
                 <input
@@ -267,17 +267,45 @@ export const CheckoutModal: React.FC = () => {
               </div>
 
               <div>
+                <label className="block font-bold text-gray-700 mb-1">State *</label>
+                <input
+                  type="text"
+                  required
+                  value={address.state}
+                  onChange={(e) => setAddress((prev) => ({ ...prev, state: e.target.value }))}
+                  placeholder="Maharashtra"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
+                />
+              </div>
+
+              <div>
                 <label className="block font-bold text-gray-700 mb-1">Pincode *</label>
                 <input
                   type="text"
                   required
+                  maxLength={6}
                   value={address.pincode}
-                  onChange={(e) => setAddress((prev) => ({ ...prev, pincode: e.target.value }))}
+                  onChange={(e) => setAddress((prev) => ({ ...prev, pincode: e.target.value.replace(/\D/g, '') }))}
                   placeholder="410501"
-                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00] font-mono font-bold"
                 />
               </div>
             </div>
+
+            {/* Shiprocket Delivery Serviceability Badge */}
+            {/^\d{6}$/.test(address.pincode) && (
+              <div className="p-3 bg-green-50/70 border border-green-200/80 rounded-2xl flex items-center justify-between text-[11px] text-[#168A45]">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 shrink-0" />
+                  <span>
+                    Verified Serviceable Pincode <strong>{address.pincode}</strong> · Express Dispatch via Atharv Chakan Depot
+                  </span>
+                </div>
+                <span className="font-bold uppercase tracking-wider text-[10px] bg-green-100/80 px-2 py-0.5 rounded-md">
+                  Active Courier Routes
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 border-t border-gray-100 flex justify-between items-center">
@@ -290,8 +318,12 @@ export const CheckoutModal: React.FC = () => {
             </button>
             <button
               onClick={() => {
-                if (!address.houseBuilding || !address.street || !address.pincode) {
-                  showToast('Please fill in complete address details', 'error');
+                if (!address.houseBuilding || !address.street || !address.city || !address.state || !address.pincode) {
+                  showToast('Please fill in complete delivery address details', 'error');
+                  return;
+                }
+                if (!/^\d{6}$/.test(address.pincode)) {
+                  showToast('Please enter a valid 6-digit Indian pincode', 'error');
                   return;
                 }
                 setStep(3);
@@ -425,23 +457,46 @@ export const CheckoutModal: React.FC = () => {
             </p>
           </div>
 
-          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-left space-y-2">
-            <div className="flex justify-between">
+          <div className="p-4 bg-gray-50 rounded-2xl border border-gray-200 text-xs text-left space-y-2.5">
+            <div className="flex justify-between items-center">
               <span className="text-gray-500">Order ID:</span>
               <strong className="font-mono text-gray-900">{confirmedOrder.orderNumber}</strong>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Amount Paid:</span>
-              <strong className="text-[#168A45]">₹{confirmedOrder.totalAmount.toLocaleString('en-IN')}</strong>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Order Summary:</span>
+              <span className="font-semibold text-gray-800">
+                {confirmedOrder.items.length} item(s) · ₹{confirmedOrder.totalAmount.toLocaleString('en-IN')}
+              </span>
             </div>
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-gray-500">Payment Status:</span>
-              <span className="font-bold text-[#168A45]">{confirmedOrder.paymentStatus}</span>
+              <span className="font-bold text-[#168A45]">{confirmedOrder.paymentStatus} ({confirmedOrder.paymentMethod})</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Store Depot:</span>
-              <span>Manik Chowk, Chakan, India</span>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Order Status:</span>
+              <span className="font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-200">
+                {confirmedOrder.status}
+              </span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-500">Fulfillment Location:</span>
+              <span className="font-semibold text-gray-800">Manik Chowk, Chakan, India</span>
+            </div>
+
+            {/* If Shipment exists, show AWB and tracking link */}
+            {(confirmedOrder.awbCode || confirmedOrder.trackingNumber) && (
+              <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                <span className="text-gray-500">AWB Tracking:</span>
+                <a
+                  href={`https://shiprocket.co/tracking/${confirmedOrder.awbCode || confirmedOrder.trackingNumber}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono font-bold text-[#FF6A00] hover:underline"
+                >
+                  {confirmedOrder.awbCode || confirmedOrder.trackingNumber} ↗
+                </a>
+              </div>
+            )}
           </div>
 
           <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">

@@ -28,6 +28,46 @@
     ],
     "rewrites": [
       {
+        "source": "/api/create-razorpay-order",
+        "function": "createRazorpayOrder"
+      },
+      {
+        "source": "/api/verify-razorpay-payment",
+        "function": "verifyRazorpayPayment"
+      },
+      {
+        "source": "/api/shiprocket/check-serviceability",
+        "function": "shiprocketCheckServiceability"
+      },
+      {
+        "source": "/api/shiprocket/create-shipment",
+        "function": "shiprocketCreateShipment"
+      },
+      {
+        "source": "/api/shiprocket/generate-awb",
+        "function": "shiprocketGenerateAwb"
+      },
+      {
+        "source": "/api/shiprocket/schedule-pickup",
+        "function": "shiprocketSchedulePickup"
+      },
+      {
+        "source": "/api/shiprocket/generate-label",
+        "function": "shiprocketGenerateLabel"
+      },
+      {
+        "source": "/api/shiprocket/cancel-shipment",
+        "function": "shiprocketCancelShipment"
+      },
+      {
+        "source": "/api/shiprocket/track",
+        "function": "shiprocketTrackShipment"
+      },
+      {
+        "source": "/api/shiprocket/webhook",
+        "function": "shiprocketWebhook"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

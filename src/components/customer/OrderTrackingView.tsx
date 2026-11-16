@@ -146,6 +146,32 @@ export const OrderTrackingView: React.FC = () => {
                 ))}
               </div>
 
+              {/* Tracking / Courier Banner if available (Section 16) */}
+              {(ord.awbCode || ord.trackingNumber || ord.shippingStatus) && (
+                <div className="p-3 bg-orange-50/70 border border-orange-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#168A45] animate-pulse" />
+                    <span className="font-bold text-gray-900">
+                      Shipping Status: <span className="text-[#FF6A00]">{ord.shippingStatus || 'In Transit'}</span>
+                    </span>
+                    {ord.courierPartner && (
+                      <span className="text-gray-500 text-[11px]">({ord.courierPartner})</span>
+                    )}
+                  </div>
+                  {(ord.awbCode || ord.trackingNumber) && (
+                    <a
+                      href={`https://shiprocket.co/tracking/${ord.awbCode || ord.trackingNumber}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 font-mono font-bold text-[#FF6A00] hover:underline"
+                    >
+                      <span>Track AWB: {ord.awbCode || ord.trackingNumber}</span>
+                      <span>↗</span>
+                    </a>
+                  )}
+                </div>
+              )}
+
               {/* Footer: Store Location & Total */}
               <div className="pt-3 border-t border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
                 <div className="flex items-center gap-2 text-gray-500">
