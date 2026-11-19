@@ -432,23 +432,6 @@ export const Header: React.FC = () => {
             <span className="hidden sm:inline">{authUser ? authUser.displayName : 'Sign In'}</span>
           </button>
 
-          {/* Admin Portal Entry */}
-          <button
-            onClick={() => {
-              if (authUser?.isAdmin) {
-                setActiveMode('admin');
-                setAdminView('dashboard');
-              } else {
-                setIsAdminLoginModalOpen(true);
-              }
-            }}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-gray-700 hover:text-black hover:bg-gray-100 transition-colors border border-gray-200"
-            title="ATHARV ELECTRICAL Admin Portal"
-          >
-            <span className="w-2 h-2 rounded-full bg-[#FF6A00]" />
-            <span>Admin</span>
-          </button>
-
           {/* Cart Button */}
           <button
             onClick={() => setIsCartOpen(true)}

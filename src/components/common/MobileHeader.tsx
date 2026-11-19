@@ -278,20 +278,6 @@ export const MobileHeader: React.FC = () => {
                 >
                   📦 My Orders
                 </button>
-                <button
-                  onClick={() => {
-                    setIsMenuDrawerOpen(false);
-                    if (authUser?.isAdmin) {
-                      setActiveMode('admin');
-                      setAdminView('dashboard');
-                    } else {
-                      setIsAdminLoginModalOpen(true);
-                    }
-                  }}
-                  className="w-full text-left py-1.5 text-xs text-[#FF6A00] font-bold"
-                >
-                  🛡️ Admin Management Portal
-                </button>
               </div>
             </div>
 
