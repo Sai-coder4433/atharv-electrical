@@ -39,11 +39,10 @@ export const AdminLoginPage: React.FC = () => {
     try {
       const user = await login(cleanEmail, password);
       if (user && user.isAdmin) {
-        showToast(`Welcome back, ${user.displayName || 'Administrator'}!`, 'success');
         navigate('/admin/dashboard', { replace: true });
       } else {
         setErrorMessage('Access Denied: This account does not possess verified administrator privileges.');
-        showToast('Access Denied: Administrator custom claims required.', 'error');
+        showToast('Access Denied: Administrator privileges required.', 'error');
       }
     } catch (err: any) {
       console.error('Admin login error:', err);

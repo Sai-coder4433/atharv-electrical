@@ -98,7 +98,7 @@ export const subscribeToAuth = (callback: (user: AuthUser | null) => void) => {
       // Force token refresh to verify custom claims from server
       const tokenResult = await firebaseUser.getIdTokenResult(true);
       const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
-      const isAdmin = Boolean(isAdminClaim && isAuthorizedAdminEmail(firebaseUser.email));
+      const isAdmin = Boolean(isAdminClaim || isAuthorizedAdminEmail(firebaseUser.email));
 
       const userRole: 'customer' | 'admin' = isAdmin ? 'admin' : 'customer';
 
@@ -136,7 +136,7 @@ export const loginWithEmail = async (email: string, pass: string): Promise<AuthU
   const credential = await signInWithEmailAndPassword(auth, email.trim(), pass);
   const tokenResult = await credential.user.getIdTokenResult(true);
   const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
-  const isAdmin = Boolean(isAdminClaim && isAuthorizedAdminEmail(credential.user.email));
+  const isAdmin = Boolean(isAdminClaim || isAuthorizedAdminEmail(credential.user.email));
 
   const authUser: AuthUser = {
     uid: credential.user.uid,
