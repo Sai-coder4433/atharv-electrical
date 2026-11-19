@@ -20,6 +20,8 @@ import {
   Truck,
   BarChart3,
   ShieldCheck,
+  TrendingUp,
+  Bell,
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
@@ -30,7 +32,6 @@ import { AdminSubcategories } from './AdminSubcategories';
 import { AdminBrands } from './AdminBrands';
 import { AdminInventory } from './AdminInventory';
 import { AdminOrders } from './AdminOrders';
-import { AdminCustomers } from './AdminCustomers';
 import { AdminCoupons } from './AdminCoupons';
 import { AdminBanners } from './AdminBanners';
 import { AdminReviews } from './AdminReviews';
@@ -40,6 +41,11 @@ import { AdminSettings } from './AdminSettings';
 import { AdminShipping } from './AdminShipping';
 import { AdminReports } from './AdminReports';
 import { AdminActivityLogs } from './AdminActivityLogs';
+import { AdminCRM } from './AdminCRM';
+import { AdminSalesAnalytics } from './AdminSalesAnalytics';
+import { AdminProductAnalytics } from './AdminProductAnalytics';
+import { AdminFinancials } from './AdminFinancials';
+import { AdminNotifications } from './AdminNotifications';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface NavItem {
@@ -62,6 +68,7 @@ export const AdminLayout: React.FC = () => {
     orders,
     products,
     shipments,
+    notifications,
     authUser,
     logout,
   } = useApp();
@@ -79,17 +86,32 @@ export const AdminLayout: React.FC = () => {
   const lowStockCount = products.filter(
     (p) => p.stock <= p.lowStockThreshold
   ).length;
+  const unreadNotificationsCount = notifications.filter((n) => !n.read).length;
 
-  // 9 Professional Navigation Domains
+  // Enterprise Grouped Navigation Domains
   const navSections: NavSection[] = [
     {
-      title: 'DASHBOARD',
+      title: 'MAIN DASHBOARD',
       items: [
-        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+        { id: 'dashboard', label: 'Business Overview', icon: LayoutDashboard },
       ],
     },
     {
-      title: 'PRODUCT MANAGEMENT',
+      title: 'CRM & CUSTOMERS',
+      items: [
+        { id: 'crm', label: 'CRM & 360° Intelligence', icon: Users },
+      ],
+    },
+    {
+      title: 'BUSINESS ANALYTICS',
+      items: [
+        { id: 'sales-analytics', label: 'Sales & Revenue Analytics', icon: TrendingUp },
+        { id: 'product-analytics', label: 'Product & Brand Analytics', icon: BarChart3 },
+        { id: 'financials', label: 'Profit & Financials', icon: CreditCard },
+      ],
+    },
+    {
+      title: 'CATALOG & INVENTORY',
       items: [
         { id: 'products', label: 'All Products', icon: Package },
         { id: 'categories', label: 'Categories', icon: Layers },
@@ -105,7 +127,7 @@ export const AdminLayout: React.FC = () => {
       ],
     },
     {
-      title: 'ORDER MANAGEMENT',
+      title: 'ORDERS & LOGISTICS',
       items: [
         {
           id: 'orders',
@@ -124,18 +146,6 @@ export const AdminLayout: React.FC = () => {
       ],
     },
     {
-      title: 'CUSTOMER MANAGEMENT',
-      items: [
-        { id: 'customers', label: 'All Customers', icon: Users },
-      ],
-    },
-    {
-      title: 'PAYMENT MANAGEMENT',
-      items: [
-        { id: 'payments', label: 'Cashfree & Payments', icon: CreditCard },
-      ],
-    },
-    {
       title: 'MARKETING',
       items: [
         { id: 'banners', label: 'Homepage Banners', icon: Sliders },
@@ -144,14 +154,16 @@ export const AdminLayout: React.FC = () => {
       ],
     },
     {
-      title: 'BUSINESS REPORTS',
+      title: 'REPORTS & AUDIT',
       items: [
-        { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
-      ],
-    },
-    {
-      title: 'ACTIVITY & SECURITY',
-      items: [
+        { id: 'reports', label: 'Certified Reports', icon: BarChart3 },
+        {
+          id: 'notifications',
+          label: 'Notification Centre',
+          icon: Bell,
+          badge: unreadNotificationsCount > 0 ? unreadNotificationsCount : undefined,
+          badgeColor: 'bg-red-500 text-white',
+        },
         { id: 'activity-logs', label: 'Admin Activity Logs', icon: ShieldCheck },
       ],
     },
@@ -200,6 +212,8 @@ export const AdminLayout: React.FC = () => {
                   const Icon = item.icon;
                   const isActive =
                     currentSubroute === item.id ||
+                    (item.id === 'crm' && currentSubroute === 'customers') ||
+                    (item.id === 'financials' && currentSubroute === 'payments') ||
                     (item.id === 'settings' && currentSubroute === 'store-settings');
                   return (
                     <button
@@ -304,6 +318,18 @@ export const AdminLayout: React.FC = () => {
               <span>Showroom Online · Manik Chowk, Chakan</span>
             </div>
 
+            {/* Notification Bell with unread counter */}
+            <button
+              onClick={() => handleNavClick('notifications')}
+              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+              title="Notification Centre"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white animate-pulse" />
+              )}
+            </button>
+
             <button
               onClick={() => navigate('/')}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-atharvay-gradient shadow-xs hover:shadow"
@@ -326,6 +352,11 @@ export const AdminLayout: React.FC = () => {
         {/* View Component Body */}
         <main className="p-4 sm:p-8 flex-1 overflow-y-auto">
           {currentSubroute === 'dashboard' && <AdminDashboard onNavigate={handleNavClick} />}
+          {(currentSubroute === 'crm' || currentSubroute === 'customers') && <AdminCRM />}
+          {currentSubroute === 'sales-analytics' && <AdminSalesAnalytics />}
+          {currentSubroute === 'product-analytics' && <AdminProductAnalytics />}
+          {(currentSubroute === 'financials' || currentSubroute === 'payments') && <AdminFinancials />}
+          {currentSubroute === 'notifications' && <AdminNotifications />}
           {currentSubroute === 'products' && <AdminProducts />}
           {currentSubroute === 'categories' && <AdminCategories />}
           {currentSubroute === 'subcategories' && <AdminSubcategories />}
@@ -333,12 +364,10 @@ export const AdminLayout: React.FC = () => {
           {currentSubroute === 'inventory' && <AdminInventory />}
           {currentSubroute === 'orders' && <AdminOrders />}
           {currentSubroute === 'shipping' && <AdminShipping />}
-          {currentSubroute === 'customers' && <AdminCustomers />}
           {currentSubroute === 'coupons' && <AdminCoupons />}
           {currentSubroute === 'offers' && <AdminCoupons />}
           {currentSubroute === 'banners' && <AdminBanners />}
           {currentSubroute === 'reviews' && <AdminReviews />}
-          {currentSubroute === 'payments' && <AdminPayments />}
           {currentSubroute === 'reports' && <AdminReports />}
           {currentSubroute === 'activity-logs' && <AdminActivityLogs />}
           {(currentSubroute === 'settings' || currentSubroute === 'store-settings') && <AdminStoreSettings />}

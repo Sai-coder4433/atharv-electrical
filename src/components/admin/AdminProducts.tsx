@@ -58,6 +58,7 @@ export const AdminProducts: React.FC = () => {
     // 2. Pricing
     mrp: number;
     sellingPrice: number;
+    purchasePrice: number;
     discountPercentage: number;
     gst: number;
     // 3. Inventory
@@ -89,6 +90,7 @@ export const AdminProducts: React.FC = () => {
     subcategory: 'BLDC Fans',
     mrp: 5990,
     sellingPrice: 4490,
+    purchasePrice: 3200,
     discountPercentage: 25,
     gst: 18,
     stock: 25,
@@ -132,6 +134,7 @@ export const AdminProducts: React.FC = () => {
       subcategory: 'BLDC Fans',
       mrp: 4999,
       sellingPrice: 3799,
+      purchasePrice: 2800,
       discountPercentage: 24,
       gst: 18,
       stock: 20,
@@ -170,6 +173,7 @@ export const AdminProducts: React.FC = () => {
       subcategory: prod.subcategory,
       mrp: prod.mrp,
       sellingPrice: prod.sellingPrice,
+      purchasePrice: prod.purchasePrice || Math.round(prod.sellingPrice * 0.72),
       discountPercentage: prod.discountPercentage,
       gst: prod.gst || 18,
       stock: prod.stock,
@@ -304,6 +308,7 @@ export const AdminProducts: React.FC = () => {
       shortDescription: form.shortDescription,
       mrp: Number(form.mrp),
       sellingPrice: Number(form.sellingPrice),
+      purchasePrice: Number(form.purchasePrice),
       discountPercentage: Number(form.discountPercentage),
       gst: Number(form.gst),
       stock: Number(form.stock),
@@ -763,6 +768,19 @@ export const AdminProducts: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
+                      <label className="block font-bold text-gray-700 mb-1">Purchase Cost Price (₹)</label>
+                      <input
+                        type="number"
+                        value={form.purchasePrice}
+                        onChange={(e) => setForm((prev) => ({ ...prev, purchasePrice: Number(e.target.value) }))}
+                        placeholder="Cost of goods"
+                        className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
+                      />
+                      <span className="text-[10px] text-emerald-600 font-bold mt-1 block">
+                        Est. Margin: ₹{Math.max(0, form.sellingPrice - form.purchasePrice)} ({form.sellingPrice > 0 ? (((form.sellingPrice - form.purchasePrice) / form.sellingPrice) * 100).toFixed(1) : 0}%)
+                      </span>
+                    </div>
+                    <div>
                       <label className="block font-bold text-gray-700 mb-1">
                         Calculated Discount Percentage (%)
                       </label>
@@ -778,19 +796,19 @@ export const AdminProducts: React.FC = () => {
                         </span>
                       </div>
                     </div>
+                  </div>
 
-                    <div>
-                      <label className="block font-bold text-gray-700 mb-1">GST Rate (%)</label>
-                      <select
-                        value={form.gst}
-                        onChange={(e) => setForm((prev) => ({ ...prev, gst: Number(e.target.value) }))}
-                        className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
-                      >
-                        <option value={18}>18% (Standard Electricals)</option>
-                        <option value={12}>12% (LED Fixtures)</option>
-                        <option value={28}>28% (Luxury Fittings)</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block font-bold text-gray-700 mb-1">GST Rate (%)</label>
+                    <select
+                      value={form.gst}
+                      onChange={(e) => setForm((prev) => ({ ...prev, gst: Number(e.target.value) }))}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00]"
+                    >
+                      <option value={18}>18% (Standard Electricals)</option>
+                      <option value={12}>12% (LED Fixtures)</option>
+                      <option value={28}>28% (Luxury Fittings)</option>
+                    </select>
                   </div>
                 </div>
               )}

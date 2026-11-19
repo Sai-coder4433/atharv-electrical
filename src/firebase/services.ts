@@ -45,6 +45,8 @@ import {
   AdminActivityLog,
   OrderActivityRecord,
   InventoryAdjustmentRecord,
+  AdminNotification,
+  CartItem,
 } from '../types';
 import { compressImage, fileToDataUrl } from '../utils/imageOptimizer';
 
@@ -1863,4 +1865,190 @@ export const initiateCashfreeRefund = async (payload: {
       message: err.message || 'Refund processing failed',
     };
   }
+};
+
+/**
+ * =========================================================================
+ * MODULE 11: ADMIN BUSINESS NOTIFICATIONS & ALERTS
+ * =========================================================================
+ */
+export const createAdminNotification = async (
+  notification: Omit<AdminNotification, 'id'>
+): Promise<string> => {
+  const notifId = `notif_${Date.now()}_${Math.floor(100 + Math.random() * 900)}`;
+  if (!db) return notifId;
+  try {
+    const ref = doc(db, 'notifications', notifId);
+    const data = sanitizeForFirestore({
+      ...notification,
+      id: notifId,
+      createdAt: serverTimestamp(),
+    });
+    await setDoc(ref, data);
+    return notifId;
+  } catch (err) {
+    console.warn('Failed to save notification to Firestore:', err);
+    return notifId;
+  }
+};
+
+export const fetchFirestoreNotifications = async (): Promise<AdminNotification[]> => {
+  if (!db) return [];
+  try {
+    const q = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminNotification));
+  } catch (err) {
+    console.warn('Could not fetch notifications from Firestore:', err);
+    return [];
+  }
+};
+
+export const subscribeToFirestoreNotifications = (
+  callback: (notifications: AdminNotification[]) => void
+) => {
+  if (!db) {
+    callback([]);
+    return () => {};
+  }
+  const q = query(collection(db, 'notifications'), orderBy('timestamp', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const notifs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminNotification));
+      callback(notifs);
+    },
+    (err) => {
+      console.warn('Notifications snapshot error:', err);
+      callback([]);
+    }
+  );
+};
+
+export const markFirestoreNotificationRead = async (id: string, read: boolean = true): Promise<void> => {
+  if (!db) return;
+  try {
+    await updateDoc(doc(db, 'notifications', id), { read, updatedAt: serverTimestamp() });
+  } catch (err) {
+    console.warn(`Failed to update notification ${id}:`, err);
+  }
+};
+
+export const clearAllFirestoreNotifications = async (): Promise<void> => {
+  if (!db) return;
+  try {
+    const snap = await getDocs(collection(db, 'notifications'));
+    const batch = writeBatch(db);
+    snap.docs.forEach((d) => batch.delete(d.ref));
+    await batch.commit();
+  } catch (err) {
+    console.warn('Failed to clear notifications:', err);
+  }
+};
+
+/**
+ * =========================================================================
+ * MODULE 3: CRM CUSTOMER NOTES & ACTIVITIES
+ * =========================================================================
+ */
+export const saveCustomerInternalNotes = async (
+  customerId: string,
+  notes: string[]
+): Promise<void> => {
+  if (!db) return;
+  try {
+    await setDoc(
+      doc(db, 'customers', customerId),
+      { internalNotes: notes, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn(`Failed to update internal notes for customer ${customerId}:`, err);
+  }
+};
+
+/**
+ * =========================================================================
+ * MODULE 1: AUTHENTICATED CART PERSISTENCE
+ * =========================================================================
+ */
+export const saveUserCartToFirestore = async (userId: string, cart: CartItem[]): Promise<void> => {
+  if (!db || !userId) return;
+  try {
+    await setDoc(
+      doc(db, 'carts', userId),
+      {
+        userId,
+        items: cart.map((c) => ({
+          id: c.id,
+          productId: c.product.id,
+          productName: c.product.name,
+          quantity: c.quantity,
+          unitPrice: c.unitPrice,
+          selectedVariants: c.selectedVariants,
+          productSnapshot: {
+            id: c.product.id,
+            name: c.product.name,
+            sku: c.product.sku,
+            sellingPrice: c.product.sellingPrice,
+            mrp: c.product.mrp,
+            mainImage: c.product.mainImage || '',
+            categoryName: c.product.categoryName || '',
+          },
+        })),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn(`Failed to save cart for user ${userId}:`, err);
+  }
+};
+
+export const fetchUserCartFromFirestore = async (userId: string): Promise<CartItem[] | null> => {
+  if (!db || !userId) return null;
+  try {
+    const snap = await getDoc(doc(db, 'carts', userId));
+    if (!snap.exists()) return null;
+    const data = snap.data();
+    if (!data.items || !Array.isArray(data.items)) return null;
+    return data.items.map((i: any) => ({
+      id: i.id,
+      product: {
+        ...(i.productSnapshot || {}),
+        id: i.productId || i.id,
+        name: i.productName || i.productSnapshot?.name || 'Product',
+        sellingPrice: i.unitPrice || i.productSnapshot?.sellingPrice || 0,
+        mrp: i.productSnapshot?.mrp || i.unitPrice || 0,
+        images: i.productSnapshot?.mainImage ? [i.productSnapshot.mainImage] : [],
+        stock: 99,
+        lowStockThreshold: 5,
+        rating: 5,
+        reviewCount: 1,
+        specifications: {},
+        warranty: '1 Year Warranty',
+        description: '',
+        shortDescription: '',
+        brand: 'ORIENT',
+        categoryId: 'fans',
+        categoryName: i.productSnapshot?.categoryName || 'Fans',
+        subcategory: 'Ceiling Fans',
+        slug: 'prod',
+        sku: i.productSnapshot?.sku || 'SKU-01',
+        discountPercentage: 0,
+        createdAt: new Date().toISOString(),
+      },
+      quantity: i.quantity || 1,
+      unitPrice: i.unitPrice || 0,
+      selectedVariants: i.selectedVariants || {},
+    }));
+  } catch (err) {
+    console.warn(`Failed to fetch cart for user ${userId}:`, err);
+    return null;
+  }
+};
+
+export const sendCustomerPasswordReset = async (email: string): Promise<void> => {
+  if (!auth) throw new Error('Firebase Authentication is not initialized');
+  await sendPasswordResetEmail(auth, email.trim());
 };

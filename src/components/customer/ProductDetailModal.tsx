@@ -315,10 +315,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                 <button
                   onClick={() => toggleWishlist(product.id)}
-                  className="p-3 border border-[#EAEAEA] rounded-xl hover:bg-[#F8F8F7] text-[#666666] hover:text-[#FF6A00]"
+                  className="p-3 border border-[#EAEAEA] rounded-xl hover:bg-[#F8F8F7] text-[#666666] hover:text-[#FF6A00] transition-colors"
                   title="Wishlist"
                 >
                   <Heart className={`w-5 h-5 ${isWishlisted ? 'text-[#F4511E] fill-[#F4511E]' : ''}`} />
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: product.name,
+                        text: `Check out ${product.name} on ATHARV ELECTRICAL`,
+                        url: window.location.href,
+                      }).catch(() => {});
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      showToast('Product link copied to clipboard!', 'info');
+                    }
+                  }}
+                  className="p-3 border border-[#EAEAEA] rounded-xl hover:bg-[#F8F8F7] text-[#666666] hover:text-[#FF6A00] transition-colors"
+                  title="Share Product"
+                >
+                  <Share2 className="w-5 h-5" />
                 </button>
               </div>
 

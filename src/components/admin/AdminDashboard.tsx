@@ -219,7 +219,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Total Net Revenue */}
         <div
-          onClick={() => onNavigate('payments')}
+          onClick={() => onNavigate('financials')}
           className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-[#168A45] cursor-pointer transition-all space-y-2 group"
         >
           <div className="flex items-center justify-between">
@@ -279,7 +279,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
 
         {/* Total Customers */}
         <div
-          onClick={() => onNavigate('customers')}
+          onClick={() => onNavigate('crm')}
           className="bg-white p-5 rounded-2xl border border-gray-200 shadow-xs hover:border-purple-500 cursor-pointer transition-all space-y-2 group"
         >
           <div className="flex items-center justify-between">
@@ -408,10 +408,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
                 <p className="text-xs text-gray-500">Actual billing figures computed from Firestore order ledger</p>
               </div>
               <button
-                onClick={() => onNavigate('reports')}
+                onClick={() => onNavigate('sales-analytics')}
                 className="text-xs font-bold text-[#FF6A00] hover:underline flex items-center gap-1"
               >
-                <span>Full Reports</span>
+                <span>Sales Analytics</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -620,32 +620,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) =>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <button
+                onClick={() => onNavigate('crm')}
+                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
+              >
+                <Users className="w-3.5 h-3.5 text-[#FFB000]" />
+                <span className="font-bold">CRM 360°</span>
+              </button>
+              <button
+                onClick={() => onNavigate('sales-analytics')}
+                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
+              >
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="font-bold">Sales Trends</span>
+              </button>
+              <button
+                onClick={() => onNavigate('product-analytics')}
+                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
+              >
+                <Package className="w-3.5 h-3.5 text-blue-400" />
+                <span className="font-bold">Top Products</span>
+              </button>
+              <button
                 onClick={() => onNavigate('reports')}
                 className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
               >
-                <FileText className="w-3.5 h-3.5 text-[#FFB000]" />
-                <span className="font-bold">Reports</span>
-              </button>
-              <button
-                onClick={() => onNavigate('activity-logs')}
-                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
-              >
-                <Shield className="w-3.5 h-3.5 text-blue-400" />
-                <span className="font-bold">Audit Logs</span>
-              </button>
-              <button
-                onClick={() => onNavigate('shipping')}
-                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
-              >
-                <Truck className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="font-bold">Shipping</span>
-              </button>
-              <button
-                onClick={() => onNavigate('settings')}
-                className="p-2.5 bg-neutral-800/80 hover:bg-neutral-700/80 rounded-xl text-left border border-neutral-700 transition-colors flex items-center gap-2"
-              >
-                <Package className="w-3.5 h-3.5 text-purple-400" />
-                <span className="font-bold">Settings</span>
+                <FileText className="w-3.5 h-3.5 text-purple-400" />
+                <span className="font-bold">CSV Reports</span>
               </button>
             </div>
           </div>

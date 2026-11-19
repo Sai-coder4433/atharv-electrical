@@ -69,6 +69,9 @@ export interface Product {
   shortDescription: string;
   mrp: number;
   sellingPrice: number;
+  purchasePrice?: number;
+  shippingCost?: number;
+  otherCost?: number;
   discountPercentage: number;
   gst?: number;
   emiPerMonth?: number;
@@ -329,6 +332,13 @@ export interface InventoryAdjustmentRecord {
   notes?: string;
 }
 
+export interface CustomerActivityRecord {
+  id: string;
+  action: string;
+  timestamp: string;
+  details?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -338,8 +348,35 @@ export interface Customer {
   totalSpend: number;
   lastOrderDate: string;
   status: 'Active' | 'Inactive';
+  customerType?: 'New' | 'Returning' | 'Regular' | 'High-Value' | 'Inactive';
+  averageOrderValue?: number;
+  highestOrderValue?: number;
+  preferredCategories?: string[];
+  preferredBrands?: string[];
+  internalNotes?: string[];
+  activities?: CustomerActivityRecord[];
   addresses: DeliveryAddress[];
   createdAt?: string;
+}
+
+export interface AdminNotification {
+  id: string;
+  type:
+    | 'order_created'
+    | 'payment_success'
+    | 'payment_failed'
+    | 'low_stock'
+    | 'out_of_stock'
+    | 'customer_registered'
+    | 'order_cancelled'
+    | 'refund_requested'
+    | 'shipment_delivered';
+  title: string;
+  description: string;
+  timestamp: string;
+  relatedId?: string;
+  relatedType?: 'order' | 'product' | 'customer';
+  read: boolean;
 }
 
 export interface Coupon {

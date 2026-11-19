@@ -22,6 +22,7 @@ import {
   AdminActivityLog,
   OrderActivityRecord,
   InventoryAdjustmentRecord,
+  AdminNotification,
 } from '../types';
 import {
   CATEGORIES_DATA,
@@ -109,6 +110,13 @@ import {
   fetchFirestoreCustomers,
   subscribeToFirestoreCustomers,
   initiateCashfreeRefund,
+  createAdminNotification,
+  fetchFirestoreNotifications,
+  subscribeToFirestoreNotifications,
+  markFirestoreNotificationRead,
+  clearAllFirestoreNotifications,
+  saveCustomerInternalNotes,
+  sendCustomerPasswordReset,
 } from '../firebase/services';
 
 interface Toast {
@@ -284,6 +292,17 @@ interface AppContextType {
     dimensions?: { length: number; breadth: number; height: number }
   ) => Promise<ShiprocketCourierRate[]>;
 
+  // Notifications & Alerts
+  notifications: AdminNotification[];
+  markNotificationAsRead: (id: string) => Promise<void>;
+  markAllNotificationsAsRead: () => Promise<void>;
+  clearAllNotifications: () => Promise<void>;
+  createNotification: (notif: Omit<AdminNotification, 'id'>) => Promise<string>;
+
+  // CRM Actions
+  addCustomerNote: (customerId: string, noteText: string) => Promise<void>;
+  sendCustomerPasswordResetEmail: (email: string) => Promise<void>;
+
   // Toast
   toasts: Toast[];
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
@@ -458,12 +477,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [products, categories, subcategories, brands, cart, wishlist, coupons, heroBanners, storeSettings, shipments]);
 
+  const [notifications, setNotifications] = useState<AdminNotification[]>([]);
+
   // Dynamically derive customers from orders and Firestore customers
   const derivedCustomers: Customer[] = useMemo(() => {
     const map = new Map<string, Customer>();
     customers.forEach((c) => {
-      map.set(c.id, c);
+      map.set(c.id, { ...c });
     });
+
     orders.forEach((o) => {
       const email = o.customerEmail?.toLowerCase().trim();
       const phone = o.customerPhone?.trim();
@@ -499,7 +521,84 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     });
-    return Array.from(map.values());
+
+    // Compute Advanced CRM 360 attributes for every customer
+    const result: Customer[] = [];
+    map.forEach((cust) => {
+      const email = cust.email.toLowerCase().trim();
+      const phone = cust.phone.trim();
+      const custOrders = orders.filter((o) => {
+        return (
+          (email && o.customerEmail && o.customerEmail.toLowerCase().trim() === email) ||
+          (phone && o.customerPhone && o.customerPhone.trim() === phone) ||
+          (o.customerName && cust.name && o.customerName.toLowerCase() === cust.name.toLowerCase())
+        );
+      });
+
+      const aov = cust.ordersCount > 0 ? Math.round(cust.totalSpend / cust.ordersCount) : 0;
+      const highest = custOrders.reduce((m, ord) => Math.max(m, ord.totalAmount || 0), 0);
+
+      // Category & brand preferences
+      const catCounts: Record<string, number> = {};
+      const brandCounts: Record<string, number> = {};
+      const activities: { id: string; action: string; timestamp: string; details?: string }[] = [];
+
+      // Account created activity
+      activities.push({
+        id: `act-reg-${cust.id}`,
+        action: 'Account Registered',
+        timestamp: cust.createdAt || cust.lastOrderDate || new Date().toISOString(),
+        details: 'Customer profile registered in store database',
+      });
+
+      custOrders.forEach((co) => {
+        activities.push({
+          id: `act-ord-${co.id}`,
+          action: `Order Placed (${co.orderNumber})`,
+          timestamp: co.createdAt,
+          details: `Amount ₹${co.totalAmount.toLocaleString('en-IN')} via ${co.paymentMethod} (${co.status})`,
+        });
+
+        co.items?.forEach((ci) => {
+          const cat = ci.product?.categoryName || 'General';
+          const br = ci.product?.brand || 'Generic';
+          catCounts[cat] = (catCounts[cat] || 0) + (ci.quantity || 1);
+          brandCounts[br] = (brandCounts[br] || 0) + (ci.quantity || 1);
+        });
+      });
+
+      const preferredCategories = Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a]);
+      const preferredBrands = Object.keys(brandCounts).sort((a, b) => brandCounts[b] - brandCounts[a]);
+
+      // Automatic Customer Classification
+      const daysSinceLastOrder = cust.lastOrderDate
+        ? (Date.now() - new Date(cust.lastOrderDate).getTime()) / (1000 * 60 * 60 * 24)
+        : 999;
+
+      let customerType: 'New' | 'Returning' | 'Regular' | 'High-Value' | 'Inactive' = 'New';
+      if (daysSinceLastOrder > 90 && cust.ordersCount > 0) {
+        customerType = 'Inactive';
+      } else if (cust.totalSpend >= 20000 || cust.ordersCount >= 4) {
+        customerType = 'High-Value';
+      } else if (cust.ordersCount >= 2) {
+        customerType = 'Returning';
+      } else if (cust.ordersCount === 1) {
+        customerType = 'New';
+      }
+
+      result.push({
+        ...cust,
+        customerType,
+        averageOrderValue: aov,
+        highestOrderValue: highest,
+        preferredCategories,
+        preferredBrands,
+        activities: activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()),
+        internalNotes: cust.internalNotes || [],
+      });
+    });
+
+    return result;
   }, [orders, customers]);
 
   // Toast notifier
@@ -567,6 +666,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetchFirestoreShipments().then((res) => {
       setShipments(res || []);
     });
+    fetchFirestoreNotifications().then((res) => {
+      setNotifications(res || []);
+    });
 
     // 2. Real-time Live Database Listeners
     const unsubProducts = subscribeToFirestoreProducts((liveProds) => {
@@ -605,6 +707,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const unsubShipments = subscribeToFirestoreShipments((liveShipments) => {
       setShipments(liveShipments || []);
     });
+    const unsubNotifs = subscribeToFirestoreNotifications((liveNotifs) => {
+      setNotifications(liveNotifs || []);
+    });
 
     return () => {
       unsubProducts();
@@ -619,6 +724,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubReviews();
       unsubSettings();
       unsubShipments();
+      unsubNotifs();
     };
   }, []);
 
@@ -639,6 +745,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const user = await registerWithEmail(email, pass, name);
       setAuthUser(user);
+      createAdminNotification({
+        type: 'customer_registered',
+        title: 'New Customer Registered',
+        description: `${user.displayName || email} registered an account`,
+        timestamp: new Date().toISOString(),
+        relatedId: user.uid,
+        relatedType: 'customer',
+        read: false,
+      });
       showToast(`Account created! Welcome, ${user.displayName}!`, 'success');
       return true;
     } catch (err: any) {
@@ -835,6 +950,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const updatedStock = Math.max(0, p.stock - cartMatch.quantity);
           const updatedStatus = updatedStock === 0 ? 'out_of_stock' : p.status;
           updateFirestoreProduct(p.id, { stock: updatedStock, status: updatedStatus });
+          if (updatedStock <= p.lowStockThreshold) {
+            createAdminNotification({
+              type: updatedStock === 0 ? 'out_of_stock' : 'low_stock',
+              title: updatedStock === 0 ? `Out of Stock: ${p.name}` : `Low Stock Alert: ${p.name}`,
+              description: `Remaining inventory is ${updatedStock} units (Threshold: ${p.lowStockThreshold})`,
+              timestamp: new Date().toISOString(),
+              relatedId: p.id,
+              relatedType: 'product',
+              read: false,
+            });
+          }
           return {
             ...p,
             stock: updatedStock,
@@ -847,6 +973,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Save to Firestore
     await createFirestoreOrder(newOrder);
+
+    // Business Notification
+    createAdminNotification({
+      type: 'order_created',
+      title: `New Order #${newOrder.orderNumber}`,
+      description: `${newOrder.customerName} placed an order for ₹${newOrder.totalAmount.toLocaleString('en-IN')}`,
+      timestamp: new Date().toISOString(),
+      relatedId: newOrder.id,
+      relatedType: 'order',
+      read: false,
+    });
 
     // Save payment record if paid
     if (isPaid && razorpayDetails?.paymentId) {
@@ -939,6 +1076,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setCart([]);
           setAppliedCoupon(null);
           setSelectedOrderForTracking(verification.order);
+          createAdminNotification({
+            type: 'payment_success',
+            title: `Cashfree Payment Confirmed`,
+            description: `Payment of ₹${verification.order.totalAmount.toLocaleString('en-IN')} received for Order ${verification.order.orderNumber}`,
+            timestamp: new Date().toISOString(),
+            relatedId: verification.order.id,
+            relatedType: 'order',
+            read: false,
+          });
           showToast(`Payment confirmed! Order ${verification.order.orderNumber} placed successfully.`, 'success');
           onSuccess(verification.order);
         } else {
@@ -1107,6 +1253,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newValue: status,
       description: `Updated status of Order #${targetOrder?.orderNumber || orderId} to "${status}"`,
     });
+
+    if (status === 'Delivered' || status === 'Completed') {
+      createAdminNotification({
+        type: 'shipment_delivered',
+        title: `Order Delivered: #${targetOrder?.orderNumber || orderId}`,
+        description: `Shipment delivered to ${targetOrder?.customerName || 'customer'}`,
+        timestamp: new Date().toISOString(),
+        relatedId: orderId,
+        relatedType: 'order',
+        read: false,
+      });
+    } else if (status === 'Cancelled') {
+      createAdminNotification({
+        type: 'order_cancelled',
+        title: `Order Cancelled: #${targetOrder?.orderNumber || orderId}`,
+        description: `Order cancelled for ${targetOrder?.customerName || 'customer'}`,
+        timestamp: new Date().toISOString(),
+        relatedId: orderId,
+        relatedType: 'order',
+        read: false,
+      });
+    }
 
     setOrders((prev) =>
       prev.map((ord) => {
@@ -1311,6 +1479,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         module: 'Payments',
         recordId: orderId,
         description: `Initiated ₹${amount} refund for Order #${orderId}. Reason: ${reason}`,
+      });
+      createAdminNotification({
+        type: 'refund_requested',
+        title: `Refund Processed: ₹${amount.toLocaleString('en-IN')}`,
+        description: `Refund initiated for Order #${orderId}. Reason: ${reason}`,
+        timestamp: new Date().toISOString(),
+        relatedId: orderId,
+        relatedType: 'order',
+        read: false,
       });
       showToast(res.message, 'success');
     } else {
@@ -1664,6 +1841,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Notification Methods
+  const createNotification = async (notif: Omit<AdminNotification, 'id'>): Promise<string> => {
+    return await createAdminNotification(notif);
+  };
+
+  const markNotificationAsRead = async (id: string): Promise<void> => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    await markFirestoreNotificationRead(id, true);
+  };
+
+  const markAllNotificationsAsRead = async (): Promise<void> => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    await Promise.all(notifications.filter((n) => !n.read).map((n) => markFirestoreNotificationRead(n.id, true)));
+    showToast('All notifications marked as read', 'info');
+  };
+
+  const clearAllNotifications = async (): Promise<void> => {
+    setNotifications([]);
+    await clearAllFirestoreNotifications();
+    showToast('All notifications cleared', 'info');
+  };
+
+  // CRM Customer Actions
+  const addCustomerNote = async (customerId: string, noteText: string): Promise<void> => {
+    const targetCust = derivedCustomers.find((c) => c.id === customerId);
+    const existingNotes = targetCust?.internalNotes || [];
+    const formatted = `[${new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}] ${noteText}`;
+    const newNotes = [formatted, ...existingNotes];
+    await saveCustomerInternalNotes(customerId, newNotes);
+    showToast('Internal note saved to customer profile', 'success');
+  };
+
+  const sendCustomerPasswordResetEmail = async (email: string): Promise<void> => {
+    await sendCustomerPasswordReset(email);
+    showToast(`Password reset link sent to ${email}`, 'success');
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -1766,6 +1980,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateCoupon,
         deleteCoupon,
         moderateReview,
+        notifications,
+        markNotificationAsRead,
+        markAllNotificationsAsRead,
+        clearAllNotifications,
+        createNotification,
+        addCustomerNote,
+        sendCustomerPasswordResetEmail,
         toasts,
         showToast,
         cartSubtotal,

@@ -26,6 +26,7 @@ export const CustomerAccountView: React.FC = () => {
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'orders' | 'wishlist' | 'addresses' | 'profile' | 'support'>('orders');
+  const [orderFilter, setOrderFilter] = useState<string>('ALL');
 
   const [savedAddresses, setSavedAddresses] = useState<DeliveryAddress[]>([
     {
@@ -66,7 +67,24 @@ export const CustomerAccountView: React.FC = () => {
   });
 
   const wishlistedProducts = products.filter((p) => wishlist.includes(p.id));
-  const currentCustomer = customers[0];
+  const currentCustomer = customers[0] || {
+    id: 'cust_default',
+    name: 'Customer Account',
+    email: 'customer@atharvelectrical.com',
+    phone: '+91 77200 36820',
+    ordersCount: orders.length,
+    totalSpend: orders.reduce((s, o) => s + (o.totalAmount || 0), 0),
+    lastOrderDate: new Date().toISOString(),
+    status: 'Active',
+    addresses: savedAddresses,
+  };
+
+  const initials = (currentCustomer.name || 'AE')
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .substring(0, 2)
+    .toUpperCase();
 
   const handleAddNewAddress = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +95,18 @@ export const CustomerAccountView: React.FC = () => {
     setSavedAddresses((prev) => [...prev, newAddr]);
     setIsAddAddressModalOpen(false);
     showToast('New delivery address saved!', 'success');
+  };
+
+  const handleDeleteAddress = (index: number) => {
+    setSavedAddresses((prev) => prev.filter((_, i) => i !== index));
+    showToast('Address removed', 'info');
+  };
+
+  const handleSetDefaultAddress = (index: number) => {
+    setSavedAddresses((prev) =>
+      prev.map((a, i) => ({ ...a, isDefault: i === index }))
+    );
+    showToast('Default delivery address updated', 'success');
   };
 
   return (
@@ -90,7 +120,7 @@ export const CustomerAccountView: React.FC = () => {
               background: 'linear-gradient(135deg, #FFB000 0%, #FF8A00 38%, #FF6A00 68%, #F4511E 100%)',
             }}
           >
-            RS
+            {initials}
           </div>
           <div>
             <h1 className="font-heading text-xl font-bold text-[#171717]">
@@ -152,10 +182,30 @@ export const CustomerAccountView: React.FC = () => {
       {/* TAB CONTENT: MY ORDERS */}
       {activeTab === 'orders' && (
         <div className="space-y-4">
-          {orders.length === 0 ? (
+          {/* Order Status Filters */}
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+            {['ALL', 'Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setOrderFilter(st)}
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  orderFilter === st
+                    ? 'bg-[#171717] text-white shadow-xs'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                {st === 'ALL' ? 'All Orders' : st}
+              </button>
+            ))}
+          </div>
+
+          {orders.filter((o) => orderFilter === 'ALL' || o.status === orderFilter).length === 0 ? (
             <div className="p-12 text-center bg-white rounded-2xl border border-[#EAEAEA]">
               <Package className="w-10 h-10 text-[#929292] mx-auto mb-2" />
-              <h3 className="font-heading font-bold text-base text-[#171717]">No orders yet.</h3>
+              <h3 className="font-heading font-bold text-base text-[#171717]">
+                {orderFilter === 'ALL' ? 'No orders yet.' : `No ${orderFilter} orders.`}
+              </h3>
               <p className="text-xs text-[#666666] mt-1">Start shopping from our verified electrical catalog.</p>
               <button
                 onClick={() => setCustomerView('shop')}
@@ -165,7 +215,9 @@ export const CustomerAccountView: React.FC = () => {
               </button>
             </div>
           ) : (
-            orders.map((ord) => (
+            orders
+              .filter((o) => orderFilter === 'ALL' || o.status === orderFilter)
+              .map((ord) => (
               <div
                 key={ord.id}
                 className="bg-white rounded-2xl border border-[#EAEAEA] p-5 shadow-xs hover:border-[#FFB000] transition-colors"
@@ -300,6 +352,24 @@ export const CustomerAccountView: React.FC = () => {
                 <p className="text-xs font-semibold text-[#171717] mt-3">
                   Mobile: +91 {addr.mobile}
                 </p>
+                <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+                  {!addr.isDefault && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetDefaultAddress(idx)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                    >
+                      Set as Default
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAddress(idx)}
+                    className="px-2.5 py-1 text-[11px] font-bold text-red-600 hover:bg-red-50 rounded-lg transition-colors ml-auto"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             ))}
           </div>
