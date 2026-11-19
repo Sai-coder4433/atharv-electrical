@@ -9,7 +9,7 @@ export const AdminLoginPage: React.FC = () => {
   const { authUser, authLoading, login, showToast } = useApp();
   const navigate = useNavigate();
 
-  const [email, setEmail] = useState('atharvporade@gmail.com');
+  const [email, setEmail] = useState('atharvelectricals@gmail.com');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,7 +65,7 @@ export const AdminLoginPage: React.FC = () => {
   };
 
   const handleForgotPassword = async () => {
-    const targetEmail = email.trim() || 'atharvporade@gmail.com';
+    const targetEmail = email.trim() || 'atharvelectricals@gmail.com';
     setIsResetting(true);
     setErrorMessage(null);
     setResetSuccess(null);
@@ -127,7 +127,7 @@ export const AdminLoginPage: React.FC = () => {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="atharvporade@gmail.com"
+                placeholder="atharvelectricals@gmail.com"
                 className="w-full pl-10 pr-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:border-[#FF6A00] focus:ring-2 focus:ring-orange-100 font-medium text-gray-900 transition-all"
               />
               <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />

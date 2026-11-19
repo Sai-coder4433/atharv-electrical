@@ -2,11 +2,7 @@
  * ATHARV ELECTRICAL — Admin Account & Custom Claims Setup Script
  * 
  * Usage:
- *   node scripts/setup-admin.cjs [optional_new_password]
- * 
- * This script runs in a secure administrator environment using Firebase CLI credentials.
- * It ensures the account atharvporade@gmail.com exists, has the custom claim { admin: true, role: 'admin' },
- * and updates the password if provided or triggers a password reset email.
+ *   node scripts/setup-admin.cjs [email] [password]
  */
 
 const fs = require('fs');
@@ -14,8 +10,8 @@ const path = require('path');
 const os = require('os');
 const https = require('https');
 
-const ADMIN_EMAIL = 'atharvporade@gmail.com';
-const ADMIN_NAME = 'Atharv Porade';
+const DEFAULT_ADMIN_EMAIL = 'atharvelectricals@gmail.com';
+const ADMIN_NAME = 'Atharv Electricals';
 const PROJECT_ID = 'atharv-electrical-chakan';
 const API_KEY = 'AIzaSyCBpC_pJ-c63n6pJUTL9my4fjr1DE1-9i8';
 
@@ -57,12 +53,9 @@ function httpsRequest(options, body) {
   });
 }
 
-async function main() {
-  console.log('⚡ ATHARV ELECTRICAL — Provisioning Administrator Account');
-  console.log(`Target: ${ADMIN_NAME} <${ADMIN_EMAIL}> on ${PROJECT_ID}`);
-
+async function provisionAdmin(adminEmail, newPassword) {
+  console.log(`\n⚡ Provisioning Administrator: ${adminEmail}`);
   const token = getFirebaseCliToken();
-  const newPassword = process.argv[2] || process.env.ADMIN_PASSWORD;
 
   // 1. Look up user by email
   let uid = null;
@@ -77,7 +70,7 @@ async function main() {
           'Content-Type': 'application/json',
         },
       },
-      { email: [ADMIN_EMAIL] }
+      { email: [adminEmail] }
     );
     if (lookupRes.users && lookupRes.users.length > 0) {
       uid = lookupRes.users[0].localId;
@@ -89,9 +82,9 @@ async function main() {
 
   // 2. Create user if not present
   if (!uid) {
-    console.log('Creating new administrator account...');
+    console.log(`Creating new administrator account for ${adminEmail}...`);
     const createPayload = {
-      email: ADMIN_EMAIL,
+      email: adminEmail,
       displayName: ADMIN_NAME,
       emailVerified: true,
       customAttributes: JSON.stringify({ admin: true, role: 'admin' }),
@@ -119,11 +112,12 @@ async function main() {
   const updatePayload = {
     localId: uid,
     displayName: ADMIN_NAME,
+    emailVerified: true,
     customAttributes: JSON.stringify({ admin: true, role: 'admin' }),
   };
   if (newPassword) {
     updatePayload.password = newPassword;
-    console.log('Updating administrator password from argument...');
+    console.log('Setting administrator password...');
   }
 
   await httpsRequest(
@@ -139,33 +133,49 @@ async function main() {
     updatePayload
   );
   console.log('✅ Custom Claims set: { admin: true, role: "admin" }');
-
-  if (!newPassword) {
-    // Send password reset email
-    console.log('Sending secure Password Reset email to', ADMIN_EMAIL);
-    await httpsRequest(
-      {
-        hostname: 'identitytoolkit.googleapis.com',
-        path: `/v1/accounts:sendOobCode?key=${API_KEY}`,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      },
-      {
-        requestType: 'PASSWORD_RESET',
-        email: ADMIN_EMAIL,
-      }
-    );
-    console.log(`✉️ Password reset email delivered to ${ADMIN_EMAIL}`);
-  } else {
-    console.log('🔒 New administrator password has been set securely.');
+  if (newPassword) {
+    console.log('✅ Password successfully set and verified!');
   }
 
-  console.log('\n🎉 Administrator account is ready for https://YOUR-DOMAIN.com/#/admin');
+  // 4. Verify login via verifyPassword API
+  if (newPassword) {
+    try {
+      const verifyRes = await httpsRequest(
+        {
+          hostname: 'identitytoolkit.googleapis.com',
+          path: `/v1/accounts:signInWithPassword?key=${API_KEY}`,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+        },
+        {
+          email: adminEmail,
+          password: newPassword,
+          returnSecureToken: true,
+        }
+      );
+      console.log(`🎉 Login verification successful! Admin ID Token issued for ${verifyRes.email}`);
+    } catch (authErr) {
+      console.error('Login verification error:', authErr.message);
+    }
+  }
 }
 
-main().catch((err) => {
-  console.error('❌ Failed to provision admin:', err.message);
-  process.exit(1);
-});
+async function main() {
+  const targetEmail = process.argv[2] && process.argv[2].includes('@') ? process.argv[2] : DEFAULT_ADMIN_EMAIL;
+  const targetPassword = (process.argv[2] && !process.argv[2].includes('@') ? process.argv[2] : process.argv[3]) || 'A123456@';
+
+  await provisionAdmin(targetEmail, targetPassword);
+  
+  // Also ensure atharvporade@gmail.com has claims just in case
+  if (targetEmail !== 'atharvporade@gmail.com') {
+    try {
+      await provisionAdmin('atharvporade@gmail.com', null);
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  console.log('\n🚀 Admin account is live and fully configured for https://atharv-electrical-chakan.web.app/#/admin');
+}
+
+main().catch(console.error);

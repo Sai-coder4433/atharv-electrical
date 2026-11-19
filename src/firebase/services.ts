@@ -76,6 +76,10 @@ export const sanitizeForFirestore = <T>(obj: T): T => {
  * =========================================================================
  */
 
+const AUTHORIZED_ADMIN_EMAILS = ['atharvelectricals@gmail.com', 'atharvporade@gmail.com'];
+const isAuthorizedAdminEmail = (email?: string | null): boolean =>
+  Boolean(email && AUTHORIZED_ADMIN_EMAILS.includes(email.trim().toLowerCase()));
+
 export const subscribeToAuth = (callback: (user: AuthUser | null) => void) => {
   if (!auth) {
     const saved = localStorage.getItem('ae_auth_user');
@@ -94,15 +98,14 @@ export const subscribeToAuth = (callback: (user: AuthUser | null) => void) => {
       // Force token refresh to verify custom claims from server
       const tokenResult = await firebaseUser.getIdTokenResult(true);
       const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
-      const isAuthorizedEmail = firebaseUser.email?.toLowerCase() === 'atharvporade@gmail.com';
-      const isAdmin = Boolean(isAdminClaim && isAuthorizedEmail);
+      const isAdmin = Boolean(isAdminClaim && isAuthorizedAdminEmail(firebaseUser.email));
 
       const userRole: 'customer' | 'admin' = isAdmin ? 'admin' : 'customer';
 
       const authUser: AuthUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: firebaseUser.displayName || (isAdmin ? 'Atharv Porade' : firebaseUser.email?.split('@')[0] || 'User'),
+        displayName: firebaseUser.displayName || (isAdmin ? 'Atharv Electricals' : firebaseUser.email?.split('@')[0] || 'User'),
         photoURL: firebaseUser.photoURL,
         role: userRole,
         isAdmin,
@@ -133,13 +136,12 @@ export const loginWithEmail = async (email: string, pass: string): Promise<AuthU
   const credential = await signInWithEmailAndPassword(auth, email.trim(), pass);
   const tokenResult = await credential.user.getIdTokenResult(true);
   const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
-  const isAuthorizedEmail = credential.user.email?.toLowerCase() === 'atharvporade@gmail.com';
-  const isAdmin = Boolean(isAdminClaim && isAuthorizedEmail);
+  const isAdmin = Boolean(isAdminClaim && isAuthorizedAdminEmail(credential.user.email));
 
   const authUser: AuthUser = {
     uid: credential.user.uid,
     email: credential.user.email,
-    displayName: credential.user.displayName || (isAdmin ? 'Atharv Porade' : credential.user.email?.split('@')[0] || 'User'),
+    displayName: credential.user.displayName || (isAdmin ? 'Atharv Electricals' : credential.user.email?.split('@')[0] || 'User'),
     photoURL: credential.user.photoURL,
     role: isAdmin ? 'admin' : 'customer',
     isAdmin,
@@ -149,7 +151,7 @@ export const loginWithEmail = async (email: string, pass: string): Promise<AuthU
   return authUser;
 };
 
-export const sendAdminPasswordReset = async (email: string = 'atharvporade@gmail.com'): Promise<void> => {
+export const sendAdminPasswordReset = async (email: string = 'atharvelectricals@gmail.com'): Promise<void> => {
   if (!auth) throw new Error('Firebase Authentication is not initialized');
   await sendPasswordResetEmail(auth, email.trim());
 };
