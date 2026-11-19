@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Heart, Star, ShoppingBag, Eye, Zap, Check } from 'lucide-react';
 import { Product } from '../../types';
 import { useApp } from '../../context/AppContext';
@@ -43,9 +44,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     setTimeout(() => setIsAdded(false), 1400);
   };
 
+  const navigate = useNavigate();
+
   const handleBuyNow = (e: React.MouseEvent) => {
     e.stopPropagation();
     addToCart(product, selectedVariants, 1);
+    navigate('/checkout');
     setCustomerView('checkout');
   };
 

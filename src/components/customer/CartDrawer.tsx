@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   ShoppingBag,
@@ -27,6 +28,7 @@ export const CartDrawer: React.FC = () => {
     setCustomerView,
   } = useApp();
 
+  const navigate = useNavigate();
   const [couponInput, setCouponInput] = useState('');
 
   if (!isCartOpen) return null;
@@ -45,6 +47,7 @@ export const CartDrawer: React.FC = () => {
 
   const handleProceedToCheckout = () => {
     setIsCartOpen(false);
+    navigate('/checkout');
     setCustomerView('checkout');
   };
 

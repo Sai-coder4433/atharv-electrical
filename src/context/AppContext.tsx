@@ -326,7 +326,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Mode & Views
   const [activeMode, setActiveMode] = useState<'customer' | 'admin'>('customer');
-  const [customerView, setCustomerView] = useState<string>('home');
+  const [customerView, setCustomerViewState] = useState<string>(() => {
+    const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
+    return hash || 'home';
+  });
+
+  const setCustomerView = useCallback((newView: string) => {
+    setCustomerViewState(newView);
+    const targetHash = newView === 'home' ? '#/' : `#/${newView}`;
+    if (window.location.hash.split('?')[0] !== targetHash) {
+      window.location.hash = targetHash;
+    }
+  }, []);
+
   const [adminView, setAdminView] = useState<string>('dashboard');
 
   // Active selections

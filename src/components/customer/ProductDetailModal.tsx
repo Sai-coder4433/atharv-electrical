@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   Star,
@@ -77,6 +78,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
   }
 
+  const navigate = useNavigate();
+
   const handleAddToCart = () => {
     addToCart(product, selectedVariants, quantity);
     setIsAdded(true);
@@ -86,6 +89,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleBuyNow = () => {
     addToCart(product, selectedVariants, quantity);
     onClose();
+    navigate('/checkout');
     setCustomerView('checkout');
   };
 
