@@ -125,14 +125,20 @@ export interface OrderTimelineStep {
 }
 
 export interface DeliveryAddress {
+  id?: string;
   fullName: string;
   mobile: string;
+  email?: string;
   houseBuilding: string;
+  apartment?: string;
   street: string;
   area: string;
+  landmark?: string;
   city: string;
   state: string;
   pincode: string;
+  country?: string;
+  addressType?: 'home' | 'office' | 'other';
   isDefault?: boolean;
 }
 

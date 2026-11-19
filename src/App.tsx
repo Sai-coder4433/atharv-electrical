@@ -13,6 +13,7 @@ import { CustomerAccountView } from './components/customer/CustomerAccountView';
 import { OffersView } from './components/customer/OffersView';
 import { BrandsView } from './components/customer/BrandsView';
 import { StoreLocationView } from './components/customer/StoreLocationView';
+import { PaymentStatusPage } from './components/customer/PaymentStatusPage';
 import { CustomerAuthModal } from './components/customer/CustomerAuthModal';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AdminLoginPage } from './components/admin/AdminLoginPage';
@@ -126,6 +127,7 @@ const CustomerViewWrapper: React.FC<CustomerViewWrapperProps> = ({ view }) => {
         {view === 'offers' && <OffersView />}
         {view === 'brands' && <BrandsView />}
         {view === 'location' && <StoreLocationView />}
+        {view === 'payment-status' && <PaymentStatusPage />}
       </main>
 
       {/* 3. Customer Footer */}
@@ -222,6 +224,7 @@ export default function App() {
           <Route path="/offers" element={<CustomerViewWrapper view="offers" />} />
           <Route path="/brands" element={<CustomerViewWrapper view="brands" />} />
           <Route path="/location" element={<CustomerViewWrapper view="location" />} />
+          <Route path="/payment-status" element={<CustomerViewWrapper view="payment-status" />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

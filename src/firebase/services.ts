@@ -47,6 +47,7 @@ import {
   InventoryAdjustmentRecord,
   AdminNotification,
   CartItem,
+  DeliveryAddress,
 } from '../types';
 import { compressImage, fileToDataUrl } from '../utils/imageOptimizer';
 
@@ -2051,4 +2052,246 @@ export const fetchUserCartFromFirestore = async (userId: string): Promise<CartIt
 export const sendCustomerPasswordReset = async (email: string): Promise<void> => {
   if (!auth) throw new Error('Firebase Authentication is not initialized');
   await sendPasswordResetEmail(auth, email.trim());
+};
+
+/**
+ * =========================================================================
+ * 1.6 CUSTOMER ADDRESS BOOK & INDIAN PINCODE LOOKUP
+ * =========================================================================
+ */
+
+// Offline directory of common Maharashtra and Indian PIN codes for instantaneous autocomplete
+const COMMON_PINCODES: Record<string, { city: string; state: string; area?: string }> = {
+  '410501': { city: 'Chakan, Pune', state: 'Maharashtra', area: 'Manik Chowk' },
+  '410505': { city: 'Manchar, Pune', state: 'Maharashtra' },
+  '412105': { city: 'Alandi, Pune', state: 'Maharashtra' },
+  '411001': { city: 'Pune', state: 'Maharashtra', area: 'Camp / Station' },
+  '411014': { city: 'Pune', state: 'Maharashtra', area: 'Viman Nagar / Kharadi' },
+  '411028': { city: 'Pune', state: 'Maharashtra', area: 'Hadapsar' },
+  '411038': { city: 'Pune', state: 'Maharashtra', area: 'Kothrud' },
+  '411057': { city: 'Pune', state: 'Maharashtra', area: 'Hinjawadi Infotech Park' },
+  '412101': { city: 'Pimpri-Chinchwad, Pune', state: 'Maharashtra', area: 'Pimpri' },
+  '412109': { city: 'Chakan Rural, Pune', state: 'Maharashtra', area: 'Mahalunge / Chakan MIDC' },
+  '410504': { city: 'Rajgurunagar (Khed), Pune', state: 'Maharashtra' },
+  '410507': { city: 'Talegaon Dabhade, Pune', state: 'Maharashtra' },
+  '410506': { city: 'Junnar, Pune', state: 'Maharashtra' },
+  '400001': { city: 'Mumbai', state: 'Maharashtra', area: 'Fort / South Mumbai' },
+  '400051': { city: 'Mumbai', state: 'Maharashtra', area: 'Bandra Kurla Complex (BKC)' },
+  '400076': { city: 'Mumbai', state: 'Maharashtra', area: 'Powai' },
+  '422001': { city: 'Nashik', state: 'Maharashtra' },
+  '431001': { city: 'Chhatrapati Sambhajinagar', state: 'Maharashtra' },
+  '440001': { city: 'Nagpur', state: 'Maharashtra' },
+  '416001': { city: 'Kolhapur', state: 'Maharashtra' },
+  '413001': { city: 'Solapur', state: 'Maharashtra' },
+  '110001': { city: 'New Delhi', state: 'Delhi' },
+  '560001': { city: 'Bengaluru', state: 'Karnataka' },
+  '500001': { city: 'Hyderabad', state: 'Telangana' },
+  '600001': { city: 'Chennai', state: 'Tamil Nadu' },
+  '700001': { city: 'Kolkata', state: 'West Bengal' },
+  '380001': { city: 'Ahmedabad', state: 'Gujarat' },
+};
+
+/**
+ * Fast Indian PIN Code directory lookup with live Postal API fallback
+ */
+export const lookupIndianPincode = async (pincode: string): Promise<{ city: string; state: string; area?: string } | null> => {
+  const clean = pincode.trim().replace(/\D/g, '');
+  if (clean.length !== 6) return null;
+
+  if (COMMON_PINCODES[clean]) {
+    return COMMON_PINCODES[clean];
+  }
+
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${clean}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data[0]?.Status === 'Success' && Array.isArray(data[0]?.PostOffice) && data[0].PostOffice.length > 0) {
+        const po = data[0].PostOffice[0];
+        const result = {
+          city: po.District || po.Division || po.Circle || 'Pune',
+          state: po.State || 'Maharashtra',
+          area: po.Name,
+        };
+        // Cache in memory for subsequent checks
+        COMMON_PINCODES[clean] = result;
+        return result;
+      }
+    }
+  } catch (e) {
+    console.warn('Pincode lookup online API error:', e);
+  }
+
+  // Regional heuristic fallback based on standard postal circles
+  if (clean.startsWith('41') || clean.startsWith('42') || clean.startsWith('43') || clean.startsWith('44') || clean.startsWith('40')) {
+    return { city: clean.startsWith('410') ? 'Pune / Chakan' : 'Maharashtra Area', state: 'Maharashtra' };
+  } else if (clean.startsWith('11')) {
+    return { city: 'Delhi', state: 'Delhi' };
+  } else if (clean.startsWith('56')) {
+    return { city: 'Bengaluru', state: 'Karnataka' };
+  }
+  return null;
+};
+
+/**
+ * Fetch saved customer addresses from Firestore (with localStorage fallback)
+ */
+export const fetchCustomerAddresses = async (userId: string): Promise<DeliveryAddress[]> => {
+  const localKey = `ae_addresses_${userId}`;
+  const localAddresses: DeliveryAddress[] = (() => {
+    try {
+      const val = localStorage.getItem(localKey);
+      return val ? JSON.parse(val) : [];
+    } catch {
+      return [];
+    }
+  })();
+
+  if (!db || !userId) {
+    return localAddresses;
+  }
+
+  try {
+    const snap = await getDocs(collection(db, 'customers', userId, 'addresses'));
+    if (!snap.empty) {
+      const remoteAddresses = snap.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      })) as DeliveryAddress[];
+      localStorage.setItem(localKey, JSON.stringify(remoteAddresses));
+      return remoteAddresses;
+    }
+  } catch (err) {
+    console.warn(`Could not fetch addresses for ${userId} from Firestore:`, err);
+  }
+
+  return localAddresses;
+};
+
+/**
+ * Save new or update existing customer delivery address
+ */
+export const saveCustomerAddress = async (userId: string, address: DeliveryAddress): Promise<DeliveryAddress> => {
+  const addressId = address.id || `addr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  const fullAddress: DeliveryAddress = {
+    ...address,
+    id: addressId,
+  };
+
+  const localKey = `ae_addresses_${userId}`;
+  try {
+    const existing = (() => {
+      try {
+        const val = localStorage.getItem(localKey);
+        return val ? (JSON.parse(val) as DeliveryAddress[]) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const updated = existing.filter((a) => a.id !== addressId);
+    if (fullAddress.isDefault) {
+      updated.forEach((a) => { a.isDefault = false; });
+    }
+    updated.unshift(fullAddress);
+    localStorage.setItem(localKey, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('LocalStorage save address note:', e);
+  }
+
+  if (db && userId) {
+    try {
+      await setDoc(doc(db, 'customers', userId, 'addresses', addressId), {
+        ...fullAddress,
+        updatedAt: serverTimestamp(),
+      });
+      // Also update customer profile with phone & name if available
+      await setDoc(
+        doc(db, 'customers', userId),
+        {
+          name: fullAddress.fullName,
+          phone: fullAddress.mobile,
+          defaultAddress: fullAddress,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+    } catch (err) {
+      console.warn(`Could not sync address to Firestore for ${userId}:`, err);
+    }
+  }
+
+  return fullAddress;
+};
+
+/**
+ * Delete customer delivery address
+ */
+export const deleteCustomerAddress = async (userId: string, addressId: string): Promise<void> => {
+  const localKey = `ae_addresses_${userId}`;
+  try {
+    const existing = (() => {
+      try {
+        const val = localStorage.getItem(localKey);
+        return val ? (JSON.parse(val) as DeliveryAddress[]) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const filtered = existing.filter((a) => a.id !== addressId);
+    localStorage.setItem(localKey, JSON.stringify(filtered));
+  } catch (e) {
+    console.warn('LocalStorage delete address note:', e);
+  }
+
+  if (db && userId) {
+    try {
+      await deleteDoc(doc(db, 'customers', userId, 'addresses', addressId));
+    } catch (err) {
+      console.warn(`Could not delete address from Firestore for ${userId}:`, err);
+    }
+  }
+};
+
+/**
+ * Set an address as the default delivery address
+ */
+export const setDefaultCustomerAddress = async (userId: string, addressId: string): Promise<void> => {
+  const localKey = `ae_addresses_${userId}`;
+  let targetAddress: DeliveryAddress | null = null;
+  try {
+    const existing = (() => {
+      try {
+        const val = localStorage.getItem(localKey);
+        return val ? (JSON.parse(val) as DeliveryAddress[]) : [];
+      } catch {
+        return [];
+      }
+    })();
+    const updated = existing.map((a) => {
+      if (a.id === addressId) {
+        targetAddress = { ...a, isDefault: true };
+        return targetAddress;
+      }
+      return { ...a, isDefault: false };
+    });
+    localStorage.setItem(localKey, JSON.stringify(updated));
+  } catch (e) {
+    console.warn('LocalStorage default address note:', e);
+  }
+
+  if (db && userId) {
+    try {
+      const addressesSnap = await getDocs(collection(db, 'customers', userId, 'addresses'));
+      const batch = writeBatch(db);
+      addressesSnap.forEach((d) => {
+        batch.update(d.ref, { isDefault: d.id === addressId });
+      });
+      if (targetAddress) {
+        batch.set(doc(db, 'customers', userId), { defaultAddress: targetAddress }, { merge: true });
+      }
+      await batch.commit();
+    } catch (err) {
+      console.warn('Could not update default address in Firestore:', err);
+    }
+  }
 };

@@ -40,6 +40,14 @@
         "function": "cashfreeWebhook"
       },
       {
+        "source": "/api/cashfree/order-status",
+        "function": "cashfreeOrderStatus"
+      },
+      {
+        "source": "/api/cashfree/refund",
+        "function": "cashfreeRefund"
+      },
+      {
         "source": "/api/create-razorpay-order",
         "function": "createRazorpayOrder"
       },

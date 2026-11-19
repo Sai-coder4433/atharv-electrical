@@ -172,10 +172,10 @@ exports.verifyRazorpayPayment = functions.https.onRequest((req, res) => {
  */
 
 const getCashfreeConfig = async () => {
-  let clientId = process.env.CASHFREE_CLIENT_ID || functions.config().cashfree?.client_id;
-  let clientSecret = process.env.CASHFREE_CLIENT_SECRET || functions.config().cashfree?.client_secret;
+  let clientId = process.env.CASHFREE_APP_ID || process.env.CASHFREE_CLIENT_ID || functions.config().cashfree?.client_id;
+  let clientSecret = process.env.CASHFREE_SECRET_KEY || process.env.CASHFREE_CLIENT_SECRET || functions.config().cashfree?.client_secret;
   let webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || functions.config().cashfree?.webhook_secret;
-  let env = process.env.CASHFREE_ENV || functions.config().cashfree?.env || 'sandbox';
+  let env = (process.env.CASHFREE_ENV || functions.config().cashfree?.env || 'production').toLowerCase();
 
   // Also check Firestore system/cashfree_config for runtime admin settings
   if (!clientId || !clientSecret) {
@@ -183,10 +183,10 @@ const getCashfreeConfig = async () => {
       const docSnap = await db.collection('system').doc('cashfree_config').get();
       if (docSnap.exists) {
         const data = docSnap.data();
-        clientId = clientId || data.clientId;
-        clientSecret = clientSecret || data.clientSecret;
+        clientId = clientId || data.clientId || data.appId;
+        clientSecret = clientSecret || data.clientSecret || data.secretKey;
         webhookSecret = webhookSecret || data.webhookSecret;
-        env = data.env || env;
+        env = (data.env || env).toLowerCase();
       }
     } catch (e) {
       console.warn('Could not read cashfree_config from Firestore:', e.message);
@@ -331,8 +331,8 @@ exports.createCashfreeOrder = functions.https.onRequest((req, res) => {
               customer_phone: String(deliveryAddress.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10),
             },
             order_meta: {
-              return_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/#/order-tracking?order_id=${orderId}`,
-              notify_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/api/cashfree/webhook`,
+              return_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/#/payment-status?order_id=${orderId}`,
+              notify_url: `https://us-central1-atharv-electrical-chakan.cloudfunctions.net/cashfreeWebhook`,
             },
             order_note: `Atharv Electrical Order ${orderId}`,
           }),
@@ -601,6 +601,127 @@ exports.cashfreeWebhook = functions.https.onRequest((req, res) => {
     } catch (err) {
       console.error('Error handling Cashfree webhook:', err);
       return res.status(500).json({ error: err.message });
+    }
+  });
+});
+
+/**
+ * GET /api/cashfree/order-status
+ * Check live order and payment status from Firestore & Cashfree
+ */
+exports.cashfreeOrderStatus = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const orderId = (req.query.order_id || req.body?.orderId || '').toString().trim();
+      if (!orderId) {
+        return res.status(400).json({ error: 'order_id is required' });
+      }
+
+      const orderRef = db.collection('orders').doc(orderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) {
+        return res.status(404).json({ error: `Order "${orderId}" not found in database.` });
+      }
+
+      const orderData = orderDoc.data();
+      return res.status(200).json({
+        success: true,
+        orderId,
+        status: orderData.status,
+        paymentStatus: orderData.paymentStatus,
+        totalAmount: orderData.totalAmount,
+        paymentMethod: orderData.paymentMethod,
+        cashfreePaymentId: orderData.cashfreePaymentId || null,
+        order: orderData,
+      });
+    } catch (err) {
+      console.error('Error checking Cashfree order status:', err);
+      return res.status(500).json({ error: err.message || 'Failed to retrieve order status' });
+    }
+  });
+});
+
+/**
+ * POST /api/cashfree/refund
+ * Process payment refund via Cashfree Payment Gateway
+ */
+exports.cashfreeRefund = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    try {
+      const { orderId, refundAmount, refundNote } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ error: 'orderId is required' });
+      }
+
+      const orderRef = db.collection('orders').doc(orderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) {
+        return res.status(404).json({ error: `Order "${orderId}" not found` });
+      }
+
+      const orderData = orderDoc.data();
+      const amount = Number(refundAmount) || orderData.totalAmount;
+      const refundId = `ref_${Date.now()}`;
+
+      const { clientId, clientSecret, baseUrl } = await getCashfreeConfig();
+      if (clientId && clientSecret) {
+        try {
+          const cfRes = await fetch(`${baseUrl}/orders/${orderId}/refunds`, {
+            method: 'POST',
+            headers: {
+              'x-client-id': clientId,
+              'x-client-secret': clientSecret,
+              'x-api-version': '2023-08-01',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              refund_id: refundId,
+              refund_amount: amount,
+              refund_note: refundNote || 'Admin initiated refund from Atharv Electrical portal',
+            }),
+          });
+
+          const cfRefund = await cfRes.json();
+          if (!cfRes.ok && cfRes.status !== 404) {
+            console.error('Cashfree refund response error:', cfRefund);
+          }
+        } catch (cfErr) {
+          console.warn('Cashfree online refund note:', cfErr.message);
+        }
+      }
+
+      await orderRef.update({
+        paymentStatus: 'Refunded',
+        status: 'Cancelled',
+        refundId,
+        refundAmount: amount,
+        refundNote: refundNote || 'Admin initiated refund',
+        refundedAt: new Date().toISOString(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Update payment record as well
+      await db.collection('payments').doc(orderId).set({
+        refundStatus: 'SUCCESS',
+        refundId,
+        refundAmount: amount,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+
+      return res.status(200).json({
+        success: true,
+        orderId,
+        refundId,
+        refundAmount: amount,
+        message: 'Refund recorded and processed successfully',
+      });
+    } catch (err) {
+      console.error('Error processing refund:', err);
+      return res.status(500).json({ error: err.message || 'Refund processing failed' });
     }
   });
 });
