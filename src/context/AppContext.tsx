@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Product,
   Category,
@@ -19,17 +19,16 @@ import {
   ShipmentRecord,
   ShipmentStatus,
   ShiprocketCourierRate,
+  AdminActivityLog,
+  OrderActivityRecord,
+  InventoryAdjustmentRecord,
 } from '../types';
 import {
-  PRODUCTS_DATA,
   CATEGORIES_DATA,
   SUBCATEGORIES_DATA,
   BRANDS_DATA,
-  DEMO_ORDERS,
-  DEMO_CUSTOMERS,
   DEMO_COUPONS,
   HERO_BANNERS_DATA,
-  DEMO_REVIEWS,
   STORE_LOCATION_DATA,
 } from '../data/demoData';
 import {
@@ -101,6 +100,15 @@ import {
   cancelShiprocketShipment,
   trackShiprocketShipment,
   saveShiprocketConfig,
+  logAdminActivity,
+  fetchFirestoreActivityLogs,
+  subscribeToFirestoreActivityLogs,
+  recordOrderActivity,
+  recordInventoryAdjustment,
+  fetchInventoryAdjustments,
+  fetchFirestoreCustomers,
+  subscribeToFirestoreCustomers,
+  initiateCashfreeRefund,
 } from '../firebase/services';
 
 interface Toast {
@@ -235,6 +243,25 @@ interface AppContextType {
   deleteCoupon: (id: string) => void | Promise<void>;
   moderateReview: (id: string, status: ProductReview['status']) => Promise<void>;
 
+  // Activity Logs & Audit Trail
+  activityLogs: AdminActivityLog[];
+  inventoryAdjustments: InventoryAdjustmentRecord[];
+  recordAuditLog: (
+    log: Omit<AdminActivityLog, 'id' | 'timestamp' | 'actorId' | 'actorName' | 'actorEmail' | 'actorRole'>
+  ) => Promise<void>;
+  adjustProductStock: (
+    productId: string,
+    delta: number,
+    reason: InventoryAdjustmentRecord['reason'],
+    notes?: string
+  ) => Promise<void>;
+  processOrderRefund: (
+    orderId: string,
+    paymentId: string,
+    amount: number,
+    reason: string
+  ) => Promise<{ success: boolean; message: string }>;
+
   // Admin Shipping & Shiprocket Management
   shipments: ShipmentRecord[];
   createShipmentForOrder: (
@@ -359,16 +386,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [orders, setOrders] = useState<Order[]>(() => {
-    try {
-      const saved = localStorage.getItem('ae_orders');
-      return saved ? JSON.parse(saved) : DEMO_ORDERS;
-    } catch {
-      return DEMO_ORDERS;
-    }
-  });
-
-  const [customers, setCustomers] = useState<Customer[]>(DEMO_CUSTOMERS);
+  // 100% Real Firebase State — No Mock/Demo Records
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [activityLogs, setActivityLogs] = useState<AdminActivityLog[]>([]);
+  const [inventoryAdjustments, setInventoryAdjustments] = useState<InventoryAdjustmentRecord[]>([]);
 
   const [coupons, setCoupons] = useState<Coupon[]>(() => {
     try {
@@ -388,7 +410,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  const [reviews, setReviews] = useState<ProductReview[]>(DEMO_REVIEWS);
+  const [reviews, setReviews] = useState<ProductReview[]>([]);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [shipments, setShipments] = useState<ShipmentRecord[]>(() => {
     try {
@@ -411,7 +433,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [wishlist, setWishlist] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('ae_wishlist');
-      return saved ? JSON.parse(saved) : ['prod-orient-aeroquiet', 'prod-goldmedal-ultra-panel'];
+      return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
     }
@@ -421,10 +443,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     try {
       localStorage.removeItem('ae_products');
+      localStorage.removeItem('ae_orders');
       localStorage.setItem('ae_categories', JSON.stringify(categories));
       localStorage.setItem('ae_subcategories', JSON.stringify(subcategories));
       localStorage.setItem('ae_brands', JSON.stringify(brands));
-      localStorage.setItem('ae_orders', JSON.stringify(orders));
       localStorage.setItem('ae_cart', JSON.stringify(cart));
       localStorage.setItem('ae_wishlist', JSON.stringify(wishlist));
       localStorage.setItem('ae_coupons', JSON.stringify(coupons));
@@ -434,7 +456,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (e) {
       console.warn('Storage sync warn', e);
     }
-  }, [products, categories, subcategories, brands, orders, cart, wishlist, coupons, heroBanners, storeSettings, shipments]);
+  }, [products, categories, subcategories, brands, cart, wishlist, coupons, heroBanners, storeSettings, shipments]);
+
+  // Dynamically derive customers from orders and Firestore customers
+  const derivedCustomers: Customer[] = useMemo(() => {
+    const map = new Map<string, Customer>();
+    customers.forEach((c) => {
+      map.set(c.id, c);
+    });
+    orders.forEach((o) => {
+      const email = o.customerEmail?.toLowerCase().trim();
+      const phone = o.customerPhone?.trim();
+      const key = email || phone || o.customerName.toLowerCase().replace(/\s+/g, '_');
+      if (!key) return;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          id: `cust_${key.replace(/[^a-z0-9]/g, '_')}`,
+          name: o.customerName || 'Customer',
+          email: o.customerEmail || '',
+          phone: o.customerPhone || '',
+          ordersCount: 1,
+          totalSpend: o.totalAmount || 0,
+          lastOrderDate: o.createdAt,
+          status: 'Active',
+          addresses: o.deliveryAddress ? [o.deliveryAddress] : [],
+        });
+      } else {
+        const existing = map.get(key)!;
+        existing.ordersCount += 1;
+        existing.totalSpend += o.totalAmount || 0;
+        if (new Date(o.createdAt).getTime() > new Date(existing.lastOrderDate).getTime()) {
+          existing.lastOrderDate = o.createdAt;
+        }
+        if (
+          o.deliveryAddress &&
+          !existing.addresses.some(
+            (a) => a.pincode === o.deliveryAddress.pincode && a.houseBuilding === o.deliveryAddress.houseBuilding
+          )
+        ) {
+          existing.addresses.push(o.deliveryAddress);
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [orders, customers]);
 
   // Toast notifier
   const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'success') => {
@@ -472,7 +538,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProducts(res || []);
     });
     fetchFirestoreOrders().then((res) => {
-      if (res && res.length > 0) setOrders(res);
+      setOrders(res || []);
+    });
+    fetchFirestoreCustomers().then((res) => {
+      if (res && res.length > 0) setCustomers(res);
+    });
+    fetchFirestoreActivityLogs().then((res) => {
+      setActivityLogs(res || []);
+    });
+    fetchInventoryAdjustments().then((res) => {
+      setInventoryAdjustments(res || []);
     });
     fetchFirestoreCoupons().then((res) => {
       if (res && res.length > 0) setCoupons(res);
@@ -481,16 +556,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (res && res.length > 0) setHeroBanners(res);
     });
     fetchFirestoreReviews().then((res) => {
-      if (res && res.length > 0) setReviews(res);
+      setReviews(res || []);
     });
     fetchFirestorePayments().then((res) => {
-      if (res && res.length > 0) setPayments(res);
+      setPayments(res || []);
     });
     fetchFirestoreSettings().then((res) => {
       if (res) setStoreSettings((prev) => ({ ...prev, ...res }));
     });
     fetchFirestoreShipments().then((res) => {
-      if (res && res.length > 0) setShipments(res);
+      setShipments(res || []);
     });
 
     // 2. Real-time Live Database Listeners
@@ -507,7 +582,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (liveBrands && liveBrands.length > 0) setBrands(liveBrands);
     });
     const unsubOrders = subscribeToFirestoreOrders((liveOrders) => {
-      if (liveOrders && liveOrders.length > 0) setOrders(liveOrders);
+      setOrders(liveOrders || []);
+    });
+    const unsubCustomers = subscribeToFirestoreCustomers((liveCusts) => {
+      if (liveCusts && liveCusts.length > 0) setCustomers(liveCusts);
+    });
+    const unsubLogs = subscribeToFirestoreActivityLogs((liveLogs) => {
+      setActivityLogs(liveLogs || []);
     });
     const unsubBanners = subscribeToFirestoreBanners((liveBanners) => {
       if (liveBanners && liveBanners.length > 0) setHeroBanners(liveBanners);
@@ -516,13 +597,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (liveCoupons && liveCoupons.length > 0) setCoupons(liveCoupons);
     });
     const unsubReviews = subscribeToFirestoreReviews((liveReviews) => {
-      if (liveReviews && liveReviews.length > 0) setReviews(liveReviews);
+      setReviews(liveReviews || []);
     });
     const unsubSettings = subscribeToFirestoreSettings((liveSettings) => {
       if (liveSettings) setStoreSettings((prev) => ({ ...prev, ...liveSettings }));
     });
     const unsubShipments = subscribeToFirestoreShipments((liveShipments) => {
-      if (liveShipments && liveShipments.length > 0) setShipments(liveShipments);
+      setShipments(liveShipments || []);
     });
 
     return () => {
@@ -531,6 +612,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       unsubSub();
       unsubBrands();
       unsubOrders();
+      unsubCustomers();
+      unsubLogs();
       unsubBanners();
       unsubCoupons();
       unsubReviews();
@@ -975,13 +1058,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Thank you! Your product review has been submitted for approval.', 'success');
   };
 
+  // Activity & Audit Logging Helper
+  const recordAuditLog = async (
+    log: Omit<AdminActivityLog, 'id' | 'timestamp' | 'actorId' | 'actorName' | 'actorEmail' | 'actorRole'>
+  ) => {
+    await logAdminActivity({
+      ...log,
+      actorId: authUser?.uid || 'admin',
+      actorName: authUser?.displayName || 'Atharv Electricals Admin',
+      actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+      actorRole: authUser?.role || 'admin',
+    });
+  };
+
   // Admin Order Status Update
   const updateOrderStatus = async (
     orderId: string,
     status: OrderStatus,
     paymentStatus?: Order['paymentStatus']
   ) => {
+    const targetOrder = orders.find((o) => o.id === orderId);
+    const prevStatus = targetOrder?.status;
     await updateFirestoreOrderStatus(orderId, status, paymentStatus);
+
+    // Record in Order Activity Timeline
+    await recordOrderActivity(orderId, {
+      actorId: authUser?.uid || 'admin',
+      actorName: authUser?.displayName || 'Atharv Electricals Admin',
+      actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+      actorRole: 'admin',
+      action: `Status updated to ${status}`,
+      previousValue: prevStatus,
+      newValue: status,
+      description: `Order status changed from "${prevStatus}" to "${status}".`,
+    });
+
+    // Record in Global Admin Audit Logs
+    await logAdminActivity({
+      actorId: authUser?.uid || 'admin',
+      actorName: authUser?.displayName || 'Atharv Electricals Admin',
+      actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+      actorRole: 'admin',
+      action: 'Order Status Updated',
+      module: 'Orders',
+      recordId: orderId,
+      recordName: targetOrder?.orderNumber || orderId,
+      previousValue: prevStatus,
+      newValue: status,
+      description: `Updated status of Order #${targetOrder?.orderNumber || orderId} to "${status}"`,
+    });
+
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
@@ -1012,6 +1138,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         createdAt: new Date().toISOString(),
       };
       setProducts((prev) => [newProd, ...prev.filter((p) => p.id !== docId)]);
+
+      await logAdminActivity({
+        actorId: authUser?.uid || 'admin',
+        actorName: authUser?.displayName || 'Atharv Electricals Admin',
+        actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+        actorRole: 'admin',
+        action: 'Product Created',
+        module: 'Products',
+        recordId: docId,
+        recordName: newProd.name,
+        description: `Created new product "${newProd.name}" (SKU: ${newProd.sku}) in category "${newProd.categoryName}"`,
+        newValue: newProd,
+      });
+
       showToast(`Product "${newProd.name}" saved to Firestore successfully!`, 'success');
     } catch (err: any) {
       console.error('Failed to save product to Firestore:', err);
@@ -1026,6 +1166,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setProducts((prev) =>
         prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
       );
+
+      await logAdminActivity({
+        actorId: authUser?.uid || 'admin',
+        actorName: authUser?.displayName || 'Atharv Electricals Admin',
+        actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+        actorRole: 'admin',
+        action: 'Product Updated',
+        module: 'Products',
+        recordId: id,
+        recordName: updates.name || id,
+        description: `Updated product details for "${updates.name || id}"`,
+        newValue: updates,
+      });
+
       showToast('Product updated successfully in Firestore.', 'success');
     } catch (err: any) {
       console.error('Failed to update product in Firestore:', err);
@@ -1036,8 +1190,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteProduct = async (id: string) => {
     try {
+      const targetProd = products.find((p) => p.id === id);
       await deleteFirestoreProduct(id);
       setProducts((prev) => prev.filter((p) => p.id !== id));
+
+      await logAdminActivity({
+        actorId: authUser?.uid || 'admin',
+        actorName: authUser?.displayName || 'Atharv Electricals Admin',
+        actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+        actorRole: 'admin',
+        action: 'Product Deleted',
+        module: 'Products',
+        recordId: id,
+        recordName: targetProd?.name || id,
+        description: `Deleted product "${targetProd?.name || id}" (SKU: ${targetProd?.sku || id})`,
+        previousValue: targetProd,
+      });
+
       showToast('Product deleted from Firestore catalog.', 'info');
     } catch (err: any) {
       console.error('Failed to delete product from Firestore:', err);
@@ -1065,6 +1234,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((p) => (p.id === productId ? { ...p, stock: newStock, status } : p))
     );
     showToast(`Stock updated to ${newStock} units`, 'success');
+  };
+
+  const adjustProductStock = async (
+    productId: string,
+    delta: number,
+    reason: InventoryAdjustmentRecord['reason'],
+    notes?: string
+  ) => {
+    const prod = products.find((p) => p.id === productId);
+    if (!prod) return;
+    const prevStock = prod.stock || 0;
+    const newStock = Math.max(0, prevStock + delta);
+    const status: Product['status'] = newStock <= 0 ? 'out_of_stock' : 'active';
+
+    await updateFirestoreProduct(productId, { stock: newStock, status });
+    await recordInventoryAdjustment({
+      productId,
+      productName: prod.name,
+      sku: prod.sku,
+      actorId: authUser?.uid || 'admin',
+      actorName: authUser?.displayName || 'Atharv Electricals Admin',
+      previousStock: prevStock,
+      newStock,
+      delta,
+      reason,
+      notes,
+    });
+    await logAdminActivity({
+      actorId: authUser?.uid || 'admin',
+      actorName: authUser?.displayName || 'Atharv Electricals Admin',
+      actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+      actorRole: 'admin',
+      action: 'Inventory Stock Adjusted',
+      module: 'Inventory',
+      recordId: productId,
+      recordName: prod.name,
+      previousValue: `${prevStock} units`,
+      newValue: `${newStock} units (${delta >= 0 ? '+' : ''}${delta})`,
+      description: `Stock adjusted by ${delta} units for "${prod.name}" (Reason: ${reason})`,
+    });
+
+    setProducts((prev) =>
+      prev.map((p) => (p.id === productId ? { ...p, stock: newStock, status } : p))
+    );
+    showToast(`Inventory updated: ${prod.name} now has ${newStock} units`, 'success');
+  };
+
+  const processOrderRefund = async (
+    orderId: string,
+    paymentId: string,
+    amount: number,
+    reason: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const res = await initiateCashfreeRefund({
+      orderId,
+      paymentId,
+      refundAmount: amount,
+      refundReason: reason,
+    });
+    if (res.success) {
+      await recordOrderActivity(orderId, {
+        actorId: authUser?.uid || 'admin',
+        actorName: authUser?.displayName || 'Atharv Electricals Admin',
+        actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+        actorRole: 'admin',
+        action: 'Payment Refund Initiated',
+        description: `Refund of ₹${amount} initiated. Reason: ${reason}`,
+      });
+      await logAdminActivity({
+        actorId: authUser?.uid || 'admin',
+        actorName: authUser?.displayName || 'Atharv Electricals Admin',
+        actorEmail: authUser?.email || 'atharvelectricals@gmail.com',
+        actorRole: 'admin',
+        action: 'Payment Refund Initiated',
+        module: 'Payments',
+        recordId: orderId,
+        description: `Initiated ₹${amount} refund for Order #${orderId}. Reason: ${reason}`,
+      });
+      showToast(res.message, 'success');
+    } else {
+      showToast(res.message, 'error');
+    }
+    return res;
   };
 
   // Admin Category CRUD
@@ -1450,7 +1702,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         subcategories,
         brands,
         orders,
-        customers,
+        customers: derivedCustomers,
+        activityLogs,
+        inventoryAdjustments,
         coupons,
         heroBanners,
         reviews,
@@ -1493,6 +1747,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteProduct,
         duplicateProduct,
         updateInventoryStock,
+        adjustProductStock,
+        processOrderRefund,
+        recordAuditLog,
         addCategory,
         updateCategory,
         deleteCategory,

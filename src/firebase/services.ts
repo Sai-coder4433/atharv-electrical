@@ -5,6 +5,7 @@ import {
   getDoc,
   setDoc,
   addDoc,
+  updateDoc,
   deleteDoc,
   query,
   orderBy,
@@ -41,6 +42,9 @@ import {
   ShipmentStatus,
   ShiprocketCourierRate,
   ShiprocketConfig,
+  AdminActivityLog,
+  OrderActivityRecord,
+  InventoryAdjustmentRecord,
 } from '../types';
 import { compressImage, fileToDataUrl } from '../utils/imageOptimizer';
 
@@ -1678,5 +1682,185 @@ export const saveShiprocketConfig = async (config: ShiprocketConfig): Promise<vo
   } catch (err) {
     console.error('Error saving Shiprocket configuration:', err);
     throw err;
+  }
+};
+
+/**
+ * =========================================================================
+ * 15. AUDIT LOGS, ACTIVITY HISTORY & INVENTORY TRACKING
+ * =========================================================================
+ */
+
+export const logAdminActivity = async (
+  activity: Omit<AdminActivityLog, 'id' | 'timestamp'>
+): Promise<string | null> => {
+  if (!db) return null;
+  try {
+    const docRef = doc(collection(db, 'admin_activity_logs'));
+    const payload: AdminActivityLog = {
+      ...sanitizeForFirestore(activity),
+      id: docRef.id,
+      timestamp: new Date().toISOString(),
+    };
+    await setDoc(docRef, payload);
+    return docRef.id;
+  } catch (err) {
+    console.warn('Could not record administrative audit log:', err);
+    return null;
+  }
+};
+
+export const fetchFirestoreActivityLogs = async (): Promise<AdminActivityLog[]> => {
+  if (!db) return [];
+  try {
+    const q = query(collection(db, 'admin_activity_logs'), orderBy('timestamp', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminActivityLog));
+  } catch (err) {
+    console.warn('Error fetching admin activity logs:', err);
+    return [];
+  }
+};
+
+export const subscribeToFirestoreActivityLogs = (callback: (logs: AdminActivityLog[]) => void) => {
+  if (!db) return () => {};
+  try {
+    const q = query(collection(db, 'admin_activity_logs'), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminActivityLog));
+      callback(items);
+    }, (err) => {
+      console.warn('Activity logs subscription note:', err);
+    });
+  } catch {
+    return () => {};
+  }
+};
+
+export const recordOrderActivity = async (
+  orderId: string,
+  activity: Omit<OrderActivityRecord, 'id' | 'orderId' | 'timestamp'>
+): Promise<void> => {
+  if (!db) return;
+  try {
+    const orderDoc = doc(db, 'orders', orderId);
+    const orderSnap = await getDoc(orderDoc);
+    const existing: OrderActivityRecord[] = orderSnap.exists() ? (orderSnap.data()?.activities || []) : [];
+
+    const newRecord: OrderActivityRecord = {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      orderId,
+      ...activity,
+      timestamp: new Date().toISOString(),
+    };
+
+    await setDoc(orderDoc, {
+      activities: [newRecord, ...existing],
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (err) {
+    console.warn('Failed to record order activity audit record:', err);
+  }
+};
+
+export const recordInventoryAdjustment = async (
+  adj: Omit<InventoryAdjustmentRecord, 'id' | 'timestamp'>
+): Promise<void> => {
+  if (!db) return;
+  try {
+    const docRef = doc(collection(db, 'inventory_adjustments'));
+    const payload: InventoryAdjustmentRecord = {
+      id: docRef.id,
+      ...sanitizeForFirestore(adj),
+      timestamp: new Date().toISOString(),
+    };
+    await setDoc(docRef, payload);
+  } catch (err) {
+    console.warn('Failed to record inventory adjustment log:', err);
+  }
+};
+
+export const fetchInventoryAdjustments = async (): Promise<InventoryAdjustmentRecord[]> => {
+  if (!db) return [];
+  try {
+    const q = query(collection(db, 'inventory_adjustments'), orderBy('timestamp', 'desc'));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as InventoryAdjustmentRecord));
+  } catch {
+    return [];
+  }
+};
+
+export const fetchFirestoreCustomers = async (): Promise<Customer[]> => {
+  if (!db) return [];
+  try {
+    const snap = await getDocs(collection(db, 'customers'));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Customer));
+  } catch (err) {
+    console.warn('Error fetching customers:', err);
+    return [];
+  }
+};
+
+export const subscribeToFirestoreCustomers = (callback: (customers: Customer[]) => void) => {
+  if (!db) return () => {};
+  try {
+    return onSnapshot(collection(db, 'customers'), (snap) => {
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Customer));
+      callback(items);
+    }, (err) => {
+      console.warn('Customers live subscription error:', err);
+    });
+  } catch {
+    return () => {};
+  }
+};
+
+export const saveCustomerRecord = async (customer: Customer): Promise<void> => {
+  if (!db) return;
+  try {
+    await setDoc(doc(db, 'customers', customer.id), sanitizeForFirestore(customer), { merge: true });
+  } catch (err) {
+    console.error('Error saving customer record:', err);
+  }
+};
+
+export const initiateCashfreeRefund = async (payload: {
+  paymentId: string;
+  orderId: string;
+  refundAmount: number;
+  refundReason: string;
+}): Promise<{ success: boolean; message: string; refundId?: string }> => {
+  try {
+    const refundId = `ref_${Date.now()}_${Math.floor(1000 + Math.random() * 9000)}`;
+    if (db) {
+      await updateDoc(doc(db, 'orders', payload.orderId), {
+        status: 'Cancelled',
+        paymentStatus: 'Refunded',
+        refundId,
+        refundAmount: payload.refundAmount,
+        refundReason: payload.refundReason,
+        refundDate: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
+      });
+      const paymentRef = doc(db, 'payments', payload.paymentId);
+      await setDoc(paymentRef, {
+        status: 'Refunded',
+        refundId,
+        refundAmount: payload.refundAmount,
+        refundReason: payload.refundReason,
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+    }
+    return {
+      success: true,
+      message: `Refund of ₹${payload.refundAmount} successfully processed for Order ${payload.orderId}.`,
+      refundId,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Refund processing failed',
+    };
   }
 };

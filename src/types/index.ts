@@ -148,9 +148,12 @@ export interface Order {
   couponCode?: string;
   deliveryAddress: DeliveryAddress;
   paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay' | 'Cashfree';
-  paymentStatus: 'Paid' | 'Pending' | 'Failed';
+  paymentStatus: 'Paid' | 'Pending' | 'Failed' | 'Refunded';
   status: OrderStatus;
   timeline?: OrderTimelineStep[];
+  activities?: OrderActivityRecord[];
+  cashfreeOrderId?: string;
+  cashfreePaymentId?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   courierPartner?: string;
@@ -244,15 +247,86 @@ export interface ShiprocketConfig {
 export interface PaymentRecord {
   id: string;
   orderId?: string;
+  orderNumber?: string;
+  cashfreeOrderId?: string;
+  cashfreePaymentId?: string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   amount: number;
   currency: string;
-  status: 'Created' | 'Paid' | 'Failed' | 'Refunded';
+  status: 'Created' | 'Paid' | 'Failed' | 'Refunded' | 'Pending';
   method: string;
+  customerName?: string;
   customerEmail?: string;
   customerPhone?: string;
+  refundId?: string;
+  refundAmount?: number;
+  refundStatus?: string;
+  refundReason?: string;
   createdAt: string;
+  updatedAt?: string;
+}
+
+export interface AdminActivityLog {
+  id: string;
+  activityId?: string;
+  actorId: string;
+  actorName: string;
+  actorEmail: string;
+  actorRole: string;
+  action: string;
+  module:
+    | 'Products'
+    | 'Categories'
+    | 'Subcategories'
+    | 'Brands'
+    | 'Orders'
+    | 'Inventory'
+    | 'Payments'
+    | 'Coupons'
+    | 'Banners'
+    | 'Settings'
+    | 'Auth'
+    | 'Shipping';
+  recordId?: string;
+  recordName?: string;
+  description: string;
+  previousValue?: any;
+  newValue?: any;
+  timestamp: string;
+  source?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface OrderActivityRecord {
+  id: string;
+  orderId: string;
+  actorId: string;
+  actorName: string;
+  actorEmail?: string;
+  actorRole: 'admin' | 'customer' | 'system' | 'courier';
+  action: string;
+  previousValue?: string;
+  newValue?: string;
+  description: string;
+  timestamp: string;
+  source?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface InventoryAdjustmentRecord {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  actorId: string;
+  actorName: string;
+  previousStock: number;
+  newStock: number;
+  delta: number;
+  reason: 'Restock' | 'Correction' | 'Damage / Defect' | 'Customer Return' | 'Order Fulfilled' | 'Manual Adjustment';
+  timestamp: string;
+  notes?: string;
 }
 
 export interface Customer {

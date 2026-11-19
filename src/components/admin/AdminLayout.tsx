@@ -9,7 +9,6 @@ import {
   ShoppingBag,
   Users,
   Tag,
-  Gift,
   Sliders,
   Star,
   CreditCard,
@@ -19,6 +18,8 @@ import {
   ExternalLink,
   LogOut,
   Truck,
+  BarChart3,
+  ShieldCheck,
 } from 'lucide-react';
 import { Logo } from '../common/Logo';
 import { useApp } from '../../context/AppContext';
@@ -37,7 +38,22 @@ import { AdminPayments } from './AdminPayments';
 import { AdminStoreSettings } from './AdminStoreSettings';
 import { AdminSettings } from './AdminSettings';
 import { AdminShipping } from './AdminShipping';
+import { AdminReports } from './AdminReports';
+import { AdminActivityLogs } from './AdminActivityLogs';
 import { useNavigate, useLocation } from 'react-router-dom';
+
+interface NavItem {
+  id: string;
+  label: string;
+  icon: any;
+  badge?: number | string;
+  badgeColor?: string;
+}
+
+interface NavSection {
+  title: string;
+  items: NavItem[];
+}
 
 export const AdminLayout: React.FC = () => {
   const {
@@ -64,43 +80,91 @@ export const AdminLayout: React.FC = () => {
     (p) => p.stock <= p.lowStockThreshold
   ).length;
 
-  // Sidebar navigation items
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'products', label: 'Products', icon: Package },
-    { id: 'categories', label: 'Categories', icon: Layers },
-    { id: 'subcategories', label: 'Subcategories', icon: FolderTree },
-    { id: 'brands', label: 'Brands', icon: Award },
+  // 9 Professional Navigation Domains
+  const navSections: NavSection[] = [
     {
-      id: 'inventory',
-      label: 'Inventory',
-      icon: Warehouse,
-      badge: lowStockCount > 0 ? lowStockCount : undefined,
-      badgeColor: 'bg-amber-100 text-amber-900',
+      title: 'DASHBOARD',
+      items: [
+        { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
+      ],
     },
     {
-      id: 'orders',
-      label: 'Orders',
-      icon: ShoppingBag,
-      badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined,
-      badgeColor: 'bg-orange-500 text-white',
+      title: 'PRODUCT MANAGEMENT',
+      items: [
+        { id: 'products', label: 'All Products', icon: Package },
+        { id: 'categories', label: 'Categories', icon: Layers },
+        { id: 'subcategories', label: 'Subcategories', icon: FolderTree },
+        { id: 'brands', label: 'Brands', icon: Award },
+        {
+          id: 'inventory',
+          label: 'Inventory Control',
+          icon: Warehouse,
+          badge: lowStockCount > 0 ? lowStockCount : undefined,
+          badgeColor: 'bg-amber-100 text-amber-900',
+        },
+      ],
     },
     {
-      id: 'shipping',
-      label: 'Shipping',
-      icon: Truck,
-      badge: shipments.filter((s) => s.pickupStatus === 'Pending' && s.shipmentStatus !== 'Cancelled').length || undefined,
-      badgeColor: 'bg-blue-600 text-white',
+      title: 'ORDER MANAGEMENT',
+      items: [
+        {
+          id: 'orders',
+          label: 'All Orders',
+          icon: ShoppingBag,
+          badge: pendingOrdersCount > 0 ? pendingOrdersCount : undefined,
+          badgeColor: 'bg-orange-500 text-white',
+        },
+        {
+          id: 'shipping',
+          label: 'Shiprocket Shipping',
+          icon: Truck,
+          badge: shipments.filter((s) => s.pickupStatus === 'Pending' && s.shipmentStatus !== 'Cancelled').length || undefined,
+          badgeColor: 'bg-blue-600 text-white',
+        },
+      ],
     },
-    { id: 'customers', label: 'Customers', icon: Users },
-    { id: 'coupons', label: 'Coupons', icon: Tag },
-    { id: 'offers', label: 'Offers', icon: Gift },
-    { id: 'banners', label: 'Banners', icon: Sliders },
-    { id: 'reviews', label: 'Reviews', icon: Star },
-    { id: 'payments', label: 'Payments', icon: CreditCard },
-    { id: 'settings', label: 'Store Settings', icon: Store },
-    { id: 'admin-settings', label: 'Admin Settings', icon: Settings },
+    {
+      title: 'CUSTOMER MANAGEMENT',
+      items: [
+        { id: 'customers', label: 'All Customers', icon: Users },
+      ],
+    },
+    {
+      title: 'PAYMENT MANAGEMENT',
+      items: [
+        { id: 'payments', label: 'Cashfree & Payments', icon: CreditCard },
+      ],
+    },
+    {
+      title: 'MARKETING',
+      items: [
+        { id: 'banners', label: 'Homepage Banners', icon: Sliders },
+        { id: 'coupons', label: 'Coupons & Discounts', icon: Tag },
+        { id: 'reviews', label: 'Product Reviews', icon: Star },
+      ],
+    },
+    {
+      title: 'BUSINESS REPORTS',
+      items: [
+        { id: 'reports', label: 'Reports & Analytics', icon: BarChart3 },
+      ],
+    },
+    {
+      title: 'ACTIVITY & SECURITY',
+      items: [
+        { id: 'activity-logs', label: 'Admin Activity Logs', icon: ShieldCheck },
+      ],
+    },
+    {
+      title: 'SETTINGS',
+      items: [
+        { id: 'settings', label: 'Store Settings', icon: Store },
+        { id: 'admin-settings', label: 'Admin Profile & Auth', icon: Settings },
+      ],
+    },
   ];
+
+  const allNavItems = navSections.flatMap((s) => s.items);
 
   const handleNavClick = (id: string) => {
     setAdminView(id);
@@ -121,41 +185,50 @@ export const AdminLayout: React.FC = () => {
           <div className="p-5 border-b border-neutral-800 shrink-0">
             <Logo variant="dark" size="sm" />
             <span className="text-[10px] font-mono text-gray-400 mt-2 block tracking-wider uppercase">
-              Management Portal
+              Operations Control Panel
             </span>
           </div>
 
-          {/* Navigation Links */}
-          <nav className="p-3 space-y-0.5 flex-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentSubroute === item.id || (item.id === 'settings' && currentSubroute === 'store-settings');
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleNavClick(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
-                    isActive
-                      ? 'bg-atharvay-gradient text-white shadow-xs'
-                      : 'text-gray-300 hover:text-white hover:bg-neutral-800/80'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <Icon className="w-4 h-4 shrink-0" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge !== undefined && (
-                    <span
-                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                        item.badgeColor || 'bg-white/20 text-white'
+          {/* Grouped Navigation Links */}
+          <nav className="p-3 space-y-4 flex-1">
+            {navSections.map((section) => (
+              <div key={section.title} className="space-y-1">
+                <div className="px-3 text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                  {section.title}
+                </div>
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive =
+                    currentSubroute === item.id ||
+                    (item.id === 'settings' && currentSubroute === 'store-settings');
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavClick(item.id)}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        isActive
+                          ? 'bg-atharvay-gradient text-white shadow-xs'
+                          : 'text-gray-300 hover:text-white hover:bg-neutral-800/80'
                       }`}
                     >
-                      {item.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+                      <div className="flex items-center gap-2.5">
+                        <Icon className="w-4 h-4 shrink-0" />
+                        <span>{item.label}</span>
+                      </div>
+                      {item.badge !== undefined && (
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                            item.badgeColor || 'bg-white/20 text-white'
+                          }`}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </nav>
         </div>
 
@@ -201,7 +274,7 @@ export const AdminLayout: React.FC = () => {
             <span>ATHARV ELECTRICAL Central Admin</span>
             <span className="mx-2">/</span>
             <span className="text-gray-900 font-bold capitalize">
-              {navItems.find((n) => n.id === currentSubroute)?.label || currentSubroute}
+              {allNavItems.find((n) => n.id === currentSubroute)?.label || currentSubroute}
             </span>
           </div>
 
@@ -214,10 +287,14 @@ export const AdminLayout: React.FC = () => {
                 onChange={(e) => handleNavClick(e.target.value)}
                 className="text-xs font-bold py-1.5 px-2 bg-gray-100 rounded-lg border border-gray-300"
               >
-                {navItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.label}
-                  </option>
+                {navSections.map((sec) => (
+                  <optgroup key={sec.title} label={sec.title}>
+                    {sec.items.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </div>
@@ -262,6 +339,8 @@ export const AdminLayout: React.FC = () => {
           {currentSubroute === 'banners' && <AdminBanners />}
           {currentSubroute === 'reviews' && <AdminReviews />}
           {currentSubroute === 'payments' && <AdminPayments />}
+          {currentSubroute === 'reports' && <AdminReports />}
+          {currentSubroute === 'activity-logs' && <AdminActivityLogs />}
           {(currentSubroute === 'settings' || currentSubroute === 'store-settings') && <AdminStoreSettings />}
           {currentSubroute === 'admin-settings' && <AdminSettings />}
         </main>
