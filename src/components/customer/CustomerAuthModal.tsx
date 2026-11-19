@@ -23,7 +23,12 @@ export const CustomerAuthModal: React.FC = () => {
     setLoading(true);
     let ok = false;
     if (tab === 'signin') {
-      ok = await login(email, password);
+      try {
+        const u = await login(email, password);
+        ok = Boolean(u);
+      } catch {
+        ok = false;
+      }
     } else {
       ok = await register(email, password, name);
     }

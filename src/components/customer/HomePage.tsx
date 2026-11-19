@@ -21,7 +21,8 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
   } = useApp();
 
   // Curated collections for natural discovery
-  const bestSellers = products.filter((p) => p.isBestSeller || p.rating >= 4.8).slice(0, 4);
+  const bestSellers = products.filter((p) => p.isBestSeller || (p.rating && p.rating >= 4.8)).slice(0, 4);
+  const featuredProducts = bestSellers.length > 0 ? bestSellers : products.slice(0, 4);
   const fansCollection = products.filter((p) => p.categoryId === 'fans').slice(0, 4);
   const lightsCollection = products.filter((p) => p.categoryId === 'lights').slice(0, 4);
   const switchesCollection = products.filter((p) => p.categoryId === 'switches').slice(0, 4);
@@ -65,164 +66,183 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenProductDetail }) => {
           </button>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {bestSellers.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onOpenDetail={onOpenProductDetail}
-            />
-          ))}
-        </div>
+        {products.length === 0 ? (
+          <div className="p-8 sm:p-12 text-center bg-[#FFFCF9] rounded-3xl border border-orange-100 shadow-xs">
+            <h3 className="font-heading font-bold text-lg text-[#171717]">
+              No products available yet.
+            </h3>
+            <p className="text-xs text-[#666666] mt-1.5 max-w-sm mx-auto">
+              Our store inventory is synchronizing with Cloud Firestore. New products added in the Admin Panel will appear here immediately.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {featuredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onOpenDetail={onOpenProductDetail}
+              />
+            ))}
+          </div>
+        )}
       </section>
 
       {/* 4. FANS */}
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
-        <div className="flex items-end justify-between mb-6 sm:mb-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
-              Orient Electric
-            </span>
-            <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
-              Fans
-            </h2>
-            <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Energy-saving BLDC and high-speed fans designed for silent, powerful airflow.
-            </p>
+      {fansCollection.length > 0 && (
+        <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
+          <div className="flex items-end justify-between mb-6 sm:mb-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
+                Orient Electric
+              </span>
+              <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
+                Fans
+              </h2>
+              <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
+                Energy-saving BLDC and high-speed fans designed for silent, powerful airflow.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedCategory('fans');
+                setCustomerView('shop');
+              }}
+              className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
+            >
+              <span>View All Fans</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setSelectedCategory('fans');
-              setCustomerView('shop');
-            }}
-            className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
-          >
-            <span>View All Fans</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {fansCollection.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onOpenDetail={onOpenProductDetail}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {fansCollection.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onOpenDetail={onOpenProductDetail}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 5. LIGHTS */}
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
-        <div className="flex items-end justify-between mb-6 sm:mb-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
-              Goldmedal LED
-            </span>
-            <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
-              Lights
-            </h2>
-            <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Architectural slim panels, downlights, and bright battens for every room.
-            </p>
+      {lightsCollection.length > 0 && (
+        <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
+          <div className="flex items-end justify-between mb-6 sm:mb-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
+                Goldmedal LED
+              </span>
+              <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
+                Lights
+              </h2>
+              <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
+                Architectural slim panels, downlights, and bright battens for every room.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedCategory('lights');
+                setCustomerView('shop');
+              }}
+              className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
+            >
+              <span>View All Lights</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setSelectedCategory('lights');
-              setCustomerView('shop');
-            }}
-            className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
-          >
-            <span>View All Lights</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {lightsCollection.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onOpenDetail={onOpenProductDetail}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {lightsCollection.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onOpenDetail={onOpenProductDetail}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 6. SWITCHES & SOCKETS */}
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
-        <div className="flex items-end justify-between mb-6 sm:mb-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
-              Modular Wiring
-            </span>
-            <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
-              Switches & Sockets
-            </h2>
-            <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Designer modular switches, touch regulators, and acoustic plates.
-            </p>
+      {switchesCollection.length > 0 && (
+        <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
+          <div className="flex items-end justify-between mb-6 sm:mb-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
+                Modular Wiring
+              </span>
+              <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
+                Switches & Sockets
+              </h2>
+              <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
+                Designer modular switches, touch regulators, and acoustic plates.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedCategory('switches');
+                setCustomerView('shop');
+              }}
+              className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
+            >
+              <span>View All Switches</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setSelectedCategory('switches');
-              setCustomerView('shop');
-            }}
-            className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
-          >
-            <span>View All Switches</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {switchesCollection.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onOpenDetail={onOpenProductDetail}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {switchesCollection.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onOpenDetail={onOpenProductDetail}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 7. WIRES & CABLES */}
-      <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
-        <div className="flex items-end justify-between mb-6 sm:mb-8">
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
-              Pure Copper Safety
-            </span>
-            <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
-              Wires & Cables
-            </h2>
-            <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
-              Flame-retardant multi-strand copper house wires and industrial power cables.
-            </p>
+      {wiresCollection.length > 0 && (
+        <section className="max-w-[1440px] mx-auto px-4 sm:px-6">
+          <div className="flex items-end justify-between mb-6 sm:mb-8">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-[#FF6A00] block mb-1">
+                Pure Copper Safety
+              </span>
+              <h2 className="font-heading text-xl sm:text-2xl md:text-3xl font-extrabold text-[#171717] tracking-tight">
+                Wires & Cables
+              </h2>
+              <p className="text-xs sm:text-sm text-[#666666] mt-1 font-medium">
+                Flame-retardant multi-strand copper house wires and industrial power cables.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedCategory('wires');
+                setCustomerView('shop');
+              }}
+              className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
+            >
+              <span>View All Wires</span>
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-          <button
-            onClick={() => {
-              setSelectedCategory('wires');
-              setCustomerView('shop');
-            }}
-            className="text-xs font-bold text-[#FF6A00] hover:text-[#F4511E] flex items-center gap-1 group whitespace-nowrap"
-          >
-            <span>View All Wires</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-          </button>
-        </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-          {wiresCollection.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              onOpenDetail={onOpenProductDetail}
-            />
-          ))}
-        </div>
-      </section>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {wiresCollection.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                onOpenDetail={onOpenProductDetail}
+              />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 8. FEATURED BRANDS */}
       <section className="max-w-[1440px] mx-auto px-4 sm:px-6">

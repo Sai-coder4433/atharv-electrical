@@ -19,6 +19,7 @@ import {
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
   User,
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -84,27 +85,27 @@ export const subscribeToAuth = (callback: (user: AuthUser | null) => void) => {
 
   return onAuthStateChanged(auth, async (firebaseUser: User | null) => {
     if (!firebaseUser) {
-      const saved = localStorage.getItem('ae_auth_user');
-      callback(saved ? JSON.parse(saved) : null);
+      localStorage.removeItem('ae_auth_user');
+      callback(null);
       return;
     }
 
     try {
-      const tokenResult = await firebaseUser.getIdTokenResult();
-      const isAdminClaim = Boolean(tokenResult.claims.admin || tokenResult.claims.role === 'admin');
-      const isAdminEmail =
-        firebaseUser.email === 'admin@atharvelectrical.com' ||
-        firebaseUser.email?.toLowerCase().startsWith('admin');
+      // Force token refresh to verify custom claims from server
+      const tokenResult = await firebaseUser.getIdTokenResult(true);
+      const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
+      const isAuthorizedEmail = firebaseUser.email?.toLowerCase() === 'atharvporade@gmail.com';
+      const isAdmin = Boolean(isAdminClaim && isAuthorizedEmail);
 
-      const userRole: 'customer' | 'admin' = isAdminClaim || isAdminEmail ? 'admin' : 'customer';
+      const userRole: 'customer' | 'admin' = isAdmin ? 'admin' : 'customer';
 
       const authUser: AuthUser = {
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        displayName: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+        displayName: firebaseUser.displayName || (isAdmin ? 'Atharv Porade' : firebaseUser.email?.split('@')[0] || 'User'),
         photoURL: firebaseUser.photoURL,
         role: userRole,
-        isAdmin: userRole === 'admin',
+        isAdmin,
       };
 
       localStorage.setItem('ae_auth_user', JSON.stringify(authUser));
@@ -124,50 +125,33 @@ export const subscribeToAuth = (callback: (user: AuthUser | null) => void) => {
 };
 
 export const loginWithEmail = async (email: string, pass: string): Promise<AuthUser> => {
-  const isAdmin = email.toLowerCase().includes('admin') || email === 'admin@atharvelectrical.com';
-
   if (!auth) {
-    const user: AuthUser = {
-      uid: 'offline_' + Date.now(),
-      email,
-      displayName: email.split('@')[0],
-      role: isAdmin ? 'admin' : 'customer',
-      isAdmin,
-    };
-    localStorage.setItem('ae_auth_user', JSON.stringify(user));
-    return user;
+    throw new Error('Firebase Authentication is not initialized.');
   }
 
-  try {
-    const credential = await signInWithEmailAndPassword(auth, email, pass);
-    const tokenResult = await credential.user.getIdTokenResult();
-    const isAdminUser = Boolean(
-      tokenResult.claims.admin ||
-      tokenResult.claims.role === 'admin' ||
-      email === 'admin@atharvelectrical.com'
-    );
+  // Authentic Firebase Auth Sign-in: Rejects invalid password without silent bypass
+  const credential = await signInWithEmailAndPassword(auth, email.trim(), pass);
+  const tokenResult = await credential.user.getIdTokenResult(true);
+  const isAdminClaim = Boolean(tokenResult.claims.admin === true || tokenResult.claims.role === 'admin');
+  const isAuthorizedEmail = credential.user.email?.toLowerCase() === 'atharvporade@gmail.com';
+  const isAdmin = Boolean(isAdminClaim && isAuthorizedEmail);
 
-    const user: AuthUser = {
-      uid: credential.user.uid,
-      email: credential.user.email,
-      displayName: credential.user.displayName || email.split('@')[0],
-      role: isAdminUser ? 'admin' : 'customer',
-      isAdmin: isAdminUser,
-    };
-    localStorage.setItem('ae_auth_user', JSON.stringify(user));
-    return user;
-  } catch (err) {
-    console.warn('Firebase Auth sign-in note, proceeding with admin session:', err);
-    const user: AuthUser = {
-      uid: 'admin_local_' + Date.now(),
-      email,
-      displayName: email.split('@')[0],
-      role: isAdmin ? 'admin' : 'customer',
-      isAdmin,
-    };
-    localStorage.setItem('ae_auth_user', JSON.stringify(user));
-    return user;
-  }
+  const authUser: AuthUser = {
+    uid: credential.user.uid,
+    email: credential.user.email,
+    displayName: credential.user.displayName || (isAdmin ? 'Atharv Porade' : credential.user.email?.split('@')[0] || 'User'),
+    photoURL: credential.user.photoURL,
+    role: isAdmin ? 'admin' : 'customer',
+    isAdmin,
+  };
+
+  localStorage.setItem('ae_auth_user', JSON.stringify(authUser));
+  return authUser;
+};
+
+export const sendAdminPasswordReset = async (email: string = 'atharvporade@gmail.com'): Promise<void> => {
+  if (!auth) throw new Error('Firebase Authentication is not initialized');
+  await sendPasswordResetEmail(auth, email.trim());
 };
 
 export const registerWithEmail = async (email: string, pass: string, name?: string): Promise<AuthUser> => {
@@ -397,19 +381,17 @@ export const subscribeToFirestoreCategories = (callback: (cats: Category[]) => v
   if (!db) return () => {};
   try {
     return onSnapshot(collection(db, 'categories'), (snap) => {
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            imageUrl: data.imageUrl || data.image,
-            image: data.image || data.imageUrl,
-            isActive: data.isActive !== false,
-            ...data,
-          } as Category;
-        });
-        callback(items);
-      }
+      const items = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          imageUrl: data.imageUrl || data.image,
+          image: data.image || data.imageUrl,
+          isActive: data.isActive !== false,
+          ...data,
+        } as Category;
+      });
+      callback(items);
     }, (err) => {
       console.warn('Categories live subscription note:', err);
     });
@@ -489,19 +471,17 @@ export const subscribeToFirestoreSubcategories = (callback: (subs: SubcategoryIt
   if (!db) return () => {};
   try {
     return onSnapshot(collection(db, 'subcategories'), (snap) => {
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            imageUrl: data.imageUrl || data.image,
-            image: data.image || data.imageUrl,
-            isActive: data.isActive !== false,
-            ...data,
-          } as SubcategoryItem;
-        });
-        callback(items);
-      }
+      const items = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          imageUrl: data.imageUrl || data.image,
+          image: data.image || data.imageUrl,
+          isActive: data.isActive !== false,
+          ...data,
+        } as SubcategoryItem;
+      });
+      callback(items);
     }, (err) => {
       console.warn('Subcategories live subscription note:', err);
     });
@@ -561,10 +541,8 @@ export const subscribeToFirestoreBrands = (callback: (brands: BrandItem[]) => vo
   if (!db) return () => {};
   try {
     return onSnapshot(collection(db, 'brands'), (snap) => {
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as BrandItem));
-        callback(items);
-      }
+      const items = snap.docs.map((d) => ({ id: d.id, ...d.data() } as BrandItem));
+      callback(items);
     }, (err) => {
       console.warn('Brands live subscription note:', err);
     });
@@ -583,7 +561,6 @@ export const fetchFirestoreProducts = async (): Promise<Product[] | null> => {
   if (!db) return null;
   try {
     const snap = await getDocs(collection(db, 'products'));
-    if (snap.empty) return null;
     return snap.docs.map((d) => {
       const data = d.data();
       return {
@@ -658,17 +635,15 @@ export const subscribeToFirestoreProducts = (callback: (prods: Product[]) => voi
   if (!db) return () => {};
   try {
     return onSnapshot(collection(db, 'products'), (snap) => {
-      if (!snap.empty) {
-        const items = snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            productId: data.productId || d.id,
-            ...data,
-          } as Product;
-        });
-        callback(items);
-      }
+      const items = snap.docs.map((d) => {
+        const data = d.data();
+        return {
+          id: d.id,
+          productId: data.productId || d.id,
+          ...data,
+        } as Product;
+      });
+      callback(items);
     }, (err) => {
       console.warn('Products live subscription note:', err);
     });
@@ -833,6 +808,58 @@ export const verifyRazorpaySignature = async (verificationPayload: {
   }
 
   return true;
+};
+
+export interface CashfreeOrderResponse {
+  success: boolean;
+  orderId: string;
+  cfOrderId: string;
+  paymentSessionId: string;
+  totalAmount: number;
+  subtotal: number;
+  discount: number;
+  deliveryCharge: number;
+  isSandbox?: boolean;
+  hasLiveCredentials?: boolean;
+}
+
+export const createCashfreePaymentOrder = async (payload: {
+  items: Array<{ productId: string; quantity: number; selectedVariants?: Record<string, string> }>;
+  deliveryAddress: any;
+  customerDetails: { customerId?: string; customerName: string; customerEmail: string; customerPhone: string };
+  couponCode?: string;
+}): Promise<CashfreeOrderResponse> => {
+  const response = await fetch('/api/cashfree/create-order', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to initialize Cashfree payment order');
+  }
+  return data;
+};
+
+export const verifyCashfreePaymentSession = async (orderId: string): Promise<{
+  success: boolean;
+  paymentStatus: 'Paid' | 'Failed' | 'Pending';
+  status: string;
+  order?: Order;
+  message?: string;
+}> => {
+  const response = await fetch('/api/cashfree/verify-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orderId }),
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Failed to verify Cashfree payment');
+  }
+  return data;
 };
 
 /**

@@ -25,6 +25,7 @@ export const CheckoutModal: React.FC = () => {
     cartDeliveryCharge,
     cartTotal,
     placeOrder,
+    processCashfreePayment,
     processRazorpayPayment,
     setCustomerView,
     deliveryPincode,
@@ -58,7 +59,7 @@ export const CheckoutModal: React.FC = () => {
   });
 
   // Step 3: Payment Method
-  const [paymentOption, setPaymentOption] = useState<'razorpay' | 'cod'>('razorpay');
+  const [paymentOption, setPaymentOption] = useState<'cashfree' | 'cod' | 'razorpay'>('cashfree');
 
   if (cart.length === 0 && step !== 4) {
     return (
@@ -87,7 +88,20 @@ export const CheckoutModal: React.FC = () => {
       mobile: customerInfo.mobile,
     };
 
-    if (paymentOption === 'razorpay') {
+    if (paymentOption === 'cashfree') {
+      await processCashfreePayment(
+        finalAddress,
+        (order) => {
+          setIsProcessing(false);
+          setConfirmedOrder(order);
+          setStep(4);
+        },
+        (errorMsg) => {
+          setIsProcessing(false);
+          showToast(errorMsg || 'Cashfree payment was cancelled or could not be completed', 'error');
+        }
+      );
+    } else if (paymentOption === 'razorpay') {
       await processRazorpayPayment(
         finalAddress,
         (order) => {
@@ -349,9 +363,9 @@ export const CheckoutModal: React.FC = () => {
           {/* Payment Method Selection */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div
-              onClick={() => setPaymentOption('razorpay')}
+              onClick={() => setPaymentOption('cashfree')}
               className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                paymentOption === 'razorpay'
+                paymentOption === 'cashfree'
                   ? 'border-[#FF6A00] bg-orange-50/40 ring-2 ring-orange-200'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
@@ -359,14 +373,14 @@ export const CheckoutModal: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-gray-900 flex items-center gap-2">
                   <CreditCard className="w-4 h-4 text-[#FF6A00]" />
-                  Razorpay Secure Checkout
+                  Cashfree Secure Online Payments
                 </span>
                 <span className="text-[10px] font-bold text-[#168A45] bg-green-50 px-2 py-0.5 rounded">
                   Recommended
                 </span>
               </div>
               <p className="text-[11px] text-gray-600">
-                UPI (GPay, PhonePe, Paytm), Credit & Debit Cards, Net Banking, and Wallets.
+                Instant UPI (Google Pay, PhonePe, Paytm), Credit & Debit Cards, Net Banking, and Wallets.
               </p>
             </div>
 

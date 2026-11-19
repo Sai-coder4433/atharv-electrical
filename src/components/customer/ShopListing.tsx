@@ -6,6 +6,7 @@ import {
   Star,
   RotateCcw,
   Check,
+  Package,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { ProductCard } from './ProductCard';
@@ -33,7 +34,7 @@ export const ShopListing: React.FC<ShopListingProps> = ({
   } = useApp();
 
   // Filters state
-  const [maxPrice, setMaxPrice] = useState<number>(15000);
+  const [maxPrice, setMaxPrice] = useState<number>(50000);
   const [minRating, setMinRating] = useState<number>(0);
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<
@@ -59,7 +60,7 @@ export const ShopListing: React.FC<ShopListingProps> = ({
         }
 
         // Category
-        if (selectedCategory && p.categoryId !== selectedCategory) {
+        if (selectedCategory && selectedCategory !== 'ALL' && selectedCategory !== 'all' && p.categoryId !== selectedCategory) {
           return false;
         }
 
@@ -335,15 +336,15 @@ export const ShopListing: React.FC<ShopListingProps> = ({
             <input
               type="range"
               min={200}
-              max={15000}
-              step={200}
+              max={50000}
+              step={500}
               value={maxPrice}
               onChange={(e) => setMaxPrice(Number(e.target.value))}
               className="w-full accent-[#FF6A00] cursor-pointer"
             />
             <div className="flex justify-between text-[10px] text-[#929292] mt-1">
               <span>₹200</span>
-              <span>₹15,000+</span>
+              <span>₹50,000+</span>
             </div>
           </div>
 
@@ -389,7 +390,19 @@ export const ShopListing: React.FC<ShopListingProps> = ({
 
         {/* Right Products Grid (Desktop 3 or 4 cols, Mobile 2 cols) */}
         <div className="col-span-1 md:col-span-3">
-          {filteredProducts.length === 0 ? (
+          {products.length === 0 ? (
+            <div className="p-12 text-center bg-[#FFFCF9] rounded-3xl border border-orange-100 py-20 shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-orange-50 text-[#FF6A00] flex items-center justify-center mx-auto mb-4">
+                <Package className="w-8 h-8" />
+              </div>
+              <h3 className="font-heading font-bold text-xl text-[#171717]">
+                No products available yet.
+              </h3>
+              <p className="text-xs text-[#666666] mt-2 max-w-sm mx-auto leading-relaxed">
+                Products created and saved by the administrator in the Admin Panel will appear here immediately in real time.
+              </p>
+            </div>
+          ) : filteredProducts.length === 0 ? (
             <div className="p-12 text-center bg-[#F8F8F7] rounded-2xl border border-[#EAEAEA]">
               <h3 className="font-heading font-bold text-base text-[#171717]">
                 No electrical products match your filters
@@ -461,8 +474,8 @@ export const ShopListing: React.FC<ShopListingProps> = ({
                 <input
                   type="range"
                   min={200}
-                  max={15000}
-                  step={200}
+                  max={50000}
+                  step={500}
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   className="w-full accent-[#FF6A00]"

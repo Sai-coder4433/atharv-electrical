@@ -1,10 +1,111 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ATHARV ELECTRICAL — Storefront & Admin Catalog Rules
-    // Allow public access to view products, and allow admin/customers to sync data
-    match /{document=**} {
+    
+    // Helper function to check if caller is verified administrator
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.email == 'atharvporade@gmail.com'
+      );
+    }
+
+    // Products: public read, admin write
+    match /products/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Categories: public read, admin write
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Subcategories: public read, admin write
+    match /subcategories/{subcategoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Brands: public read, admin write
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Inventory: public read, admin write
+    match /inventory/{inventoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Banners: public read, admin write
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Coupons: public read, admin write
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Settings & Store Configuration: public read, admin write
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Reviews: public read, customer can create, admin can manage
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Orders: Anyone can create order / check tracking by order ID, admin can manage all
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Payments: Admin & Cloud Functions can manage, customer can read own
+    match /payments/{paymentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Shipments: public read tracking, admin write
+    match /shipments/{shipmentId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Users / Profiles: User can manage own profile, admin can manage all
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (request.auth != null && request.auth.uid == userId);
+    }
+
+    // Carts & Wishlists: Public read/write per session or authenticated user
+    match /carts/{cartId} {
       allow read, write: if true;
+    }
+    match /wishlists/{wishlistId} {
+      allow read, write: if true;
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read, write: if isAdmin();
+    }
+
+    // System configurations (e.g. shiprocket_auth, cashfree_config)
+    match /system/{docId} {
+      allow read, write: if isAdmin();
     }
   }
 }

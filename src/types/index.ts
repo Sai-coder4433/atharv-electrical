@@ -147,7 +147,7 @@ export interface Order {
   totalAmount: number;
   couponCode?: string;
   deliveryAddress: DeliveryAddress;
-  paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay';
+  paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay' | 'Cashfree';
   paymentStatus: 'Paid' | 'Pending' | 'Failed';
   status: OrderStatus;
   timeline?: OrderTimelineStep[];

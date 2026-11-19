@@ -28,6 +28,18 @@
     ],
     "rewrites": [
       {
+        "source": "/api/cashfree/create-order",
+        "function": "createCashfreeOrder"
+      },
+      {
+        "source": "/api/cashfree/verify-payment",
+        "function": "verifyCashfreePayment"
+      },
+      {
+        "source": "/api/cashfree/webhook",
+        "function": "cashfreeWebhook"
+      },
+      {
         "source": "/api/create-razorpay-order",
         "function": "createRazorpayOrder"
       },

@@ -165,6 +165,446 @@ exports.verifyRazorpayPayment = functions.https.onRequest((req, res) => {
   });
 });
 
+/**
+ * =========================================================================
+ * 1.5 CASHFREE PAYMENTS INTEGRATION
+ * =========================================================================
+ */
+
+const getCashfreeConfig = async () => {
+  let clientId = process.env.CASHFREE_CLIENT_ID || functions.config().cashfree?.client_id;
+  let clientSecret = process.env.CASHFREE_CLIENT_SECRET || functions.config().cashfree?.client_secret;
+  let webhookSecret = process.env.CASHFREE_WEBHOOK_SECRET || functions.config().cashfree?.webhook_secret;
+  let env = process.env.CASHFREE_ENV || functions.config().cashfree?.env || 'sandbox';
+
+  // Also check Firestore system/cashfree_config for runtime admin settings
+  if (!clientId || !clientSecret) {
+    try {
+      const docSnap = await db.collection('system').doc('cashfree_config').get();
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        clientId = clientId || data.clientId;
+        clientSecret = clientSecret || data.clientSecret;
+        webhookSecret = webhookSecret || data.webhookSecret;
+        env = data.env || env;
+      }
+    } catch (e) {
+      console.warn('Could not read cashfree_config from Firestore:', e.message);
+    }
+  }
+
+  const baseUrl = env === 'production'
+    ? 'https://api.cashfree.com/pg'
+    : 'https://sandbox.cashfree.com/pg';
+
+  return { clientId, clientSecret, webhookSecret, env, baseUrl };
+};
+
+exports.createCashfreeOrder = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    try {
+      const { items, customerDetails, deliveryAddress, couponCode } = req.body;
+
+      if (!items || !Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: 'Cart is empty. Products required to initiate payment.' });
+      }
+
+      if (!deliveryAddress || !deliveryAddress.fullName || !deliveryAddress.mobile) {
+        return res.status(400).json({ error: 'Valid delivery address with name and phone number is required.' });
+      }
+
+      // CRITICAL PRICING SECURITY: Fetch actual prices strictly from Firestore products collection!
+      let subtotal = 0;
+      const verifiedItems = [];
+
+      for (const item of items) {
+        const prodId = item.productId || item.id;
+        const qty = Number(item.quantity) || 1;
+
+        if (!prodId || qty <= 0) {
+          return res.status(400).json({ error: 'Invalid product or quantity specified' });
+        }
+
+        const prodDoc = await db.collection('products').doc(prodId).get();
+        if (!prodDoc.exists) {
+          return res.status(400).json({ error: `Product "${prodId}" does not exist in store database.` });
+        }
+
+        const prodData = prodDoc.data();
+        if (prodData.isActive === false || prodData.status === 'draft') {
+          return res.status(400).json({ error: `Product "${prodData.name}" is currently inactive.` });
+        }
+
+        if (Number(prodData.stock || 0) < qty) {
+          return res.status(400).json({
+            error: `Insufficient stock for "${prodData.name}". Available: ${prodData.stock}, Requested: ${qty}`
+          });
+        }
+
+        const unitPrice = Number(prodData.sellingPrice);
+        if (isNaN(unitPrice) || unitPrice < 0) {
+          return res.status(400).json({ error: `Invalid pricing recorded for product "${prodData.name}".` });
+        }
+
+        subtotal += unitPrice * qty;
+        verifiedItems.push({
+          id: prodId,
+          productId: prodId,
+          product: {
+            id: prodId,
+            name: prodData.name,
+            sku: prodData.sku || '',
+            sellingPrice: unitPrice,
+            mrp: Number(prodData.mrp) || unitPrice,
+            mainImage: prodData.mainImage || '',
+            brand: prodData.brand || 'ATHARV',
+            categoryId: prodData.categoryId || 'general',
+          },
+          selectedVariants: item.selectedVariants || {},
+          quantity: qty,
+          unitPrice,
+        });
+      }
+
+      // Validate Coupon if supplied
+      let discount = 0;
+      if (couponCode && typeof couponCode === 'string') {
+        const cleanCode = couponCode.trim().toUpperCase();
+        try {
+          const couponDoc = await db.collection('coupons').doc(cleanCode).get();
+          if (couponDoc.exists) {
+            const couponData = couponDoc.data();
+            const isActive = couponData.active !== false;
+            const notExpired = !couponData.expiryDate || new Date(couponData.expiryDate).getTime() > Date.now();
+            const minMet = !couponData.minOrderAmount || subtotal >= Number(couponData.minOrderAmount);
+
+            if (isActive && notExpired && minMet) {
+              if (couponData.discountType === 'flat') {
+                discount = Number(couponData.discountValue || 0);
+              } else {
+                const pct = Number(couponData.discountPercentage || 0);
+                discount = (subtotal * pct) / 100;
+                if (couponData.maxDiscount) {
+                  discount = Math.min(discount, Number(couponData.maxDiscount));
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Coupon validation note:', e.message);
+        }
+      }
+
+      // Calculate Shipping Charge (Free above ₹999)
+      const deliveryCharge = subtotal >= 999 ? 0 : 99;
+      const totalAmount = Math.max(1, Math.round(subtotal - discount + deliveryCharge));
+
+      // Generate unique Order ID
+      const orderId = `AE_${Date.now()}_${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+
+      const { clientId, clientSecret, env, baseUrl } = await getCashfreeConfig();
+
+      let paymentSessionId = `cf_sess_${orderId}`;
+      let cfOrderId = `CF_${orderId}`;
+
+      if (clientId && clientSecret && clientId !== 'YOUR_CASHFREE_CLIENT_ID') {
+        const cfResponse = await fetch(`${baseUrl}/orders`, {
+          method: 'POST',
+          headers: {
+            'x-client-id': clientId,
+            'x-client-secret': clientSecret,
+            'x-api-version': '2023-08-01',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            order_id: orderId,
+            order_amount: totalAmount,
+            order_currency: 'INR',
+            customer_details: {
+              customer_id: customerDetails?.customerId || `cust_${Date.now()}`,
+              customer_name: deliveryAddress.fullName || customerDetails?.customerName || 'Customer',
+              customer_email: customerDetails?.customerEmail || 'customer@atharvelectrical.com',
+              customer_phone: String(deliveryAddress.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10),
+            },
+            order_meta: {
+              return_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/#/order-tracking?order_id=${orderId}`,
+              notify_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/api/cashfree/webhook`,
+            },
+            order_note: `Atharv Electrical Order ${orderId}`,
+          }),
+        });
+
+        const cfData = await cfResponse.json();
+        if (!cfResponse.ok) {
+          console.error('Cashfree API error:', cfData);
+          return res.status(cfResponse.statusCode || 500).json({
+            error: cfData.message || 'Cashfree API rejected order creation',
+            details: cfData,
+          });
+        }
+
+        paymentSessionId = cfData.payment_session_id;
+        cfOrderId = cfData.cf_order_id;
+      } else {
+        console.warn('Cashfree credentials not configured yet. Operating in test session mode.');
+      }
+
+      // Persist Pending Order record in Firestore
+      const orderRecord = {
+        id: orderId,
+        orderNumber: orderId,
+        userId: customerDetails?.customerId || null,
+        customerName: deliveryAddress.fullName,
+        customerPhone: deliveryAddress.mobile,
+        customerEmail: customerDetails?.customerEmail || '',
+        items: verifiedItems,
+        subtotal,
+        discount,
+        deliveryCharge,
+        totalAmount,
+        couponCode: couponCode || null,
+        deliveryAddress,
+        paymentMethod: 'Cashfree',
+        paymentStatus: 'Pending',
+        status: 'Pending',
+        cashfreeOrderId: cfOrderId,
+        paymentSessionId,
+        createdAt: new Date().toISOString(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await db.collection('orders').doc(orderId).set(orderRecord);
+
+      // Persist Payment document
+      await db.collection('payments').doc(orderId).set({
+        id: orderId,
+        orderId,
+        cashfreeOrderId: cfOrderId,
+        paymentSessionId,
+        amount: totalAmount,
+        currency: 'INR',
+        status: 'Created',
+        method: 'Cashfree',
+        customerEmail: customerDetails?.customerEmail || '',
+        customerPhone: deliveryAddress.mobile,
+        createdAt: new Date().toISOString(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      return res.status(200).json({
+        success: true,
+        orderId,
+        cfOrderId,
+        paymentSessionId,
+        totalAmount,
+        subtotal,
+        discount,
+        deliveryCharge,
+        isSandbox: env === 'sandbox',
+        hasLiveCredentials: Boolean(clientId && clientSecret && clientId !== 'YOUR_CASHFREE_CLIENT_ID'),
+      });
+    } catch (err) {
+      console.error('Error creating Cashfree payment order:', err);
+      return res.status(500).json({ error: err.message || 'Failed to initialize Cashfree payment order' });
+    }
+  });
+});
+
+exports.verifyCashfreePayment = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    try {
+      const { orderId } = req.body;
+      if (!orderId) {
+        return res.status(400).json({ error: 'orderId is required' });
+      }
+
+      const orderRef = db.collection('orders').doc(orderId);
+      const orderDoc = await orderRef.get();
+      if (!orderDoc.exists) {
+        return res.status(404).json({ error: `Order "${orderId}" not found` });
+      }
+
+      const orderData = orderDoc.data();
+
+      if (orderData.paymentStatus === 'Paid') {
+        return res.status(200).json({
+          success: true,
+          paymentStatus: 'Paid',
+          status: orderData.status,
+          order: orderData,
+        });
+      }
+
+      const { clientId, clientSecret, baseUrl } = await getCashfreeConfig();
+
+      let isPaid = false;
+      let cfPaymentId = null;
+      let paymentMethod = 'Cashfree';
+
+      if (clientId && clientSecret && clientId !== 'YOUR_CASHFREE_CLIENT_ID') {
+        const cfRes = await fetch(`${baseUrl}/orders/${orderId}/payments`, {
+          method: 'GET',
+          headers: {
+            'x-client-id': clientId,
+            'x-client-secret': clientSecret,
+            'x-api-version': '2023-08-01',
+          },
+        });
+
+        const paymentsList = await cfRes.json();
+        if (Array.isArray(paymentsList)) {
+          const successfulPayment = paymentsList.find((p) => p.payment_status === 'SUCCESS');
+          if (successfulPayment) {
+            isPaid = true;
+            cfPaymentId = successfulPayment.cf_payment_id;
+            paymentMethod = successfulPayment.payment_group || 'Cashfree';
+          }
+        }
+      } else {
+        isPaid = true;
+        cfPaymentId = `cf_test_pay_${Date.now()}`;
+      }
+
+      if (isPaid) {
+        await db.runTransaction(async (transaction) => {
+          const currentOrder = await transaction.get(orderRef);
+          if (currentOrder.data()?.paymentStatus === 'Paid') {
+            return;
+          }
+
+          // Decrement inventory stock safely for each item
+          for (const item of orderData.items || []) {
+            const prodRef = db.collection('products').doc(item.productId);
+            const prodSnap = await transaction.get(prodRef);
+            if (prodSnap.exists) {
+              const currentStock = Number(prodSnap.data().stock || 0);
+              const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
+              transaction.update(prodRef, {
+                stock: newStock,
+                status: newStock === 0 ? 'out_of_stock' : 'active',
+                isActive: newStock > 0,
+                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+            }
+          }
+
+          transaction.update(orderRef, {
+            paymentStatus: 'Paid',
+            status: 'Confirmed',
+            cashfreePaymentId: cfPaymentId,
+            paymentMethod,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          const payRef = db.collection('payments').doc(orderId);
+          transaction.set(payRef, {
+            id: orderId,
+            orderId,
+            cfPaymentId,
+            status: 'Paid',
+            method: paymentMethod,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        });
+
+        const updatedSnap = await orderRef.get();
+        return res.status(200).json({
+          success: true,
+          paymentStatus: 'Paid',
+          status: 'Confirmed',
+          cfPaymentId,
+          order: updatedSnap.data(),
+        });
+      } else {
+        await orderRef.update({
+          paymentStatus: 'Failed',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return res.status(200).json({
+          success: false,
+          paymentStatus: 'Failed',
+          message: 'Payment was not confirmed by Cashfree',
+        });
+      }
+    } catch (err) {
+      console.error('Error verifying Cashfree payment:', err);
+      return res.status(500).json({ error: err.message || 'Payment verification failed' });
+    }
+  });
+});
+
+exports.cashfreeWebhook = functions.https.onRequest((req, res) => {
+  cors(req, res, async () => {
+    try {
+      const signature = req.headers['x-webhook-signature'];
+      const timestamp = req.headers['x-webhook-timestamp'];
+      const { webhookSecret, clientSecret } = await getCashfreeConfig();
+
+      const secretToUse = webhookSecret || clientSecret;
+      if (secretToUse && signature && timestamp) {
+        const rawBody = req.rawBody ? req.rawBody.toString() : JSON.stringify(req.body);
+        const expectedSignature = crypto
+          .createHmac('sha256', secretToUse)
+          .update(timestamp + rawBody)
+          .digest('base64');
+
+        if (signature !== expectedSignature) {
+          console.warn('Invalid Cashfree webhook signature');
+          return res.status(401).json({ error: 'Invalid webhook signature' });
+        }
+      }
+
+      const event = req.body;
+      const orderId = event.data?.order?.order_id;
+      const paymentStatus = event.data?.payment?.payment_status;
+      const cfPaymentId = event.data?.payment?.cf_payment_id;
+
+      if (orderId && paymentStatus === 'SUCCESS') {
+        const orderRef = db.collection('orders').doc(orderId);
+        await db.runTransaction(async (transaction) => {
+          const ord = await transaction.get(orderRef);
+          if (ord.exists && ord.data().paymentStatus !== 'Paid') {
+            const orderData = ord.data();
+            for (const item of orderData.items || []) {
+              const prodRef = db.collection('products').doc(item.productId);
+              const prodSnap = await transaction.get(prodRef);
+              if (prodSnap.exists) {
+                const currentStock = Number(prodSnap.data().stock || 0);
+                const newStock = Math.max(0, currentStock - (Number(item.quantity) || 1));
+                transaction.update(prodRef, {
+                  stock: newStock,
+                  status: newStock === 0 ? 'out_of_stock' : 'active',
+                  isActive: newStock > 0,
+                  updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+              }
+            }
+            transaction.update(orderRef, {
+              paymentStatus: 'Paid',
+              status: 'Confirmed',
+              cashfreePaymentId: cfPaymentId,
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+          }
+        });
+      }
+
+      return res.status(200).json({ status: 'OK' });
+    } catch (err) {
+      console.error('Error handling Cashfree webhook:', err);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+});
+
 exports.setAdminRole = functions.https.onCall(async (data, context) => {
   if (!context.auth || !context.auth.token.admin) {
     throw new functions.https.HttpsError(

@@ -88,6 +88,8 @@ import {
   subscribeToFirestoreOrders,
   requestRazorpayOrder,
   verifyRazorpaySignature,
+  createCashfreePaymentOrder,
+  verifyCashfreePaymentSession,
   seedInitialFirestoreData,
   fetchFirestoreShipments,
   subscribeToFirestoreShipments,
@@ -111,7 +113,7 @@ interface AppContextType {
   // Authentication
   authUser: AuthUser | null;
   authLoading: boolean;
-  login: (email: string, pass: string) => Promise<boolean>;
+  login: (email: string, pass: string) => Promise<AuthUser>;
   register: (email: string, pass: string, name?: string) => Promise<boolean>;
   loginGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
@@ -185,12 +187,18 @@ interface AppContextType {
   removeCoupon: () => void;
   placeOrder: (
     address: DeliveryAddress,
-    paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay',
+    paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay' | 'Cashfree',
     razorpayDetails?: { orderId?: string; paymentId?: string }
   ) => Promise<Order>;
   submitProductReview: (review: Omit<ProductReview, 'id' | 'date'>) => Promise<void>;
 
-  // Razorpay Checkout
+  // Cashfree & Online Checkout
+  processCashfreePayment: (
+    address: DeliveryAddress,
+    onSuccess: (order: Order) => void,
+    onFailure: (err: string) => void
+  ) => Promise<void>;
+
   processRazorpayPayment: (
     address: DeliveryAddress,
     onSuccess: (order: Order) => void,
@@ -321,15 +329,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Persistent Collections (with Firestore Progressive Hydration)
-  const [products, setProducts] = useState<Product[]>(() => {
-    try {
-      const saved = localStorage.getItem('ae_products');
-      return saved ? JSON.parse(saved) : PRODUCTS_DATA;
-    } catch {
-      return PRODUCTS_DATA;
-    }
-  });
+  // Products collection (Cloud Firestore is the single source of truth — no fake demo items)
+  const [products, setProducts] = useState<Product[]>([]);
 
   const [categories, setCategories] = useState<Category[]>(() => {
     try {
@@ -419,7 +420,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Sync state to LocalStorage
   useEffect(() => {
     try {
-      localStorage.setItem('ae_products', JSON.stringify(products));
+      localStorage.removeItem('ae_products');
       localStorage.setItem('ae_categories', JSON.stringify(categories));
       localStorage.setItem('ae_subcategories', JSON.stringify(subcategories));
       localStorage.setItem('ae_brands', JSON.stringify(brands));
@@ -468,7 +469,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (res && res.length > 0) setBrands(res);
     });
     fetchFirestoreProducts().then((res) => {
-      if (res && res.length > 0) setProducts(res);
+      setProducts(res || []);
     });
     fetchFirestoreOrders().then((res) => {
       if (res && res.length > 0) setOrders(res);
@@ -494,7 +495,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Real-time Live Database Listeners
     const unsubProducts = subscribeToFirestoreProducts((liveProds) => {
-      if (liveProds && liveProds.length > 0) setProducts(liveProds);
+      setProducts(liveProds || []);
     });
     const unsubCategories = subscribeToFirestoreCategories((liveCats) => {
       if (liveCats && liveCats.length > 0) setCategories(liveCats);
@@ -539,15 +540,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   // Auth Functions
-  const login = async (email: string, pass: string): Promise<boolean> => {
+  const login = async (email: string, pass: string): Promise<AuthUser> => {
     try {
       const user = await loginWithEmail(email, pass);
       setAuthUser(user);
-      showToast(`Welcome back, ${user.displayName}!`, 'success');
-      return true;
+      showToast(`Welcome back, ${user.displayName || 'User'}!`, 'success');
+      return user;
     } catch (err: any) {
       showToast(err.message || 'Login failed. Check your credentials.', 'error');
-      return false;
+      throw err;
     }
   };
 
@@ -710,10 +711,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Coupon removed', 'info');
   };
 
-  // Place Order (supports COD & Razorpay)
+  // Place Order (supports COD, Cashfree & Razorpay)
   const placeOrder = async (
     address: DeliveryAddress,
-    paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay',
+    paymentMethod: 'UPI' | 'Card' | 'Net Banking' | 'Cash on Delivery' | 'Razorpay' | 'Cashfree',
     razorpayDetails?: { orderId?: string; paymentId?: string }
   ): Promise<Order> => {
     const timestamp = new Date();
@@ -789,6 +790,93 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSelectedOrderForTracking(newOrder);
     showToast(`Order ${orderNum} confirmed successfully!`, 'success');
     return newOrder;
+  };
+
+  // Cashfree Standard Checkout Flow (Server-side price calculation & verification)
+  const processCashfreePayment = async (
+    address: DeliveryAddress,
+    onSuccess: (order: Order) => void,
+    onFailure: (err: string) => void
+  ) => {
+    try {
+      if (cart.length === 0) {
+        throw new Error('Cart is empty. Please add products to proceed.');
+      }
+
+      showToast('Initiating secure Cashfree checkout...', 'info');
+
+      // 1. Prepare items payload for backend price verification
+      const itemsPayload = cart.map((item) => ({
+        productId: item.product.productId || item.product.id,
+        quantity: item.quantity,
+        selectedVariants: item.selectedVariants,
+      }));
+
+      // 2. Request backend to calculate exact Firestore price and create Cashfree order
+      const cfOrder = await createCashfreePaymentOrder({
+        items: itemsPayload,
+        deliveryAddress: address,
+        customerDetails: {
+          customerId: authUser?.uid || `cust_${Date.now()}`,
+          customerName: address.fullName,
+          customerEmail: authUser?.email || 'customer@atharvelectrical.com',
+          customerPhone: address.mobile,
+        },
+        couponCode: appliedCoupon?.code,
+      });
+
+      // 3. Load Cashfree Drop-in SDK if not already loaded
+      if (!(window as any).Cashfree) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+          script.async = true;
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error('Failed to load Cashfree payments SDK'));
+          document.body.appendChild(script);
+        });
+      }
+
+      const CashfreeSDK = (window as any).Cashfree;
+      if (CashfreeSDK && cfOrder.paymentSessionId) {
+        const cashfree = CashfreeSDK({
+          mode: cfOrder.isSandbox ? 'sandbox' : 'production',
+        });
+
+        // 4. Open Cashfree Drop-in Modal Checkout
+        await cashfree.checkout({
+          paymentSessionId: cfOrder.paymentSessionId,
+          redirectTarget: '_modal',
+        });
+
+        // 5. Server-side payment verification
+        const verification = await verifyCashfreePaymentSession(cfOrder.orderId);
+        if (verification.success && verification.order) {
+          setOrders((prev) => [verification.order!, ...prev.filter((o) => o.id !== cfOrder.orderId)]);
+          setCart([]);
+          setAppliedCoupon(null);
+          setSelectedOrderForTracking(verification.order);
+          showToast(`Payment confirmed! Order ${verification.order.orderNumber} placed successfully.`, 'success');
+          onSuccess(verification.order);
+        } else {
+          onFailure('Payment was cancelled or could not be verified by Cashfree.');
+        }
+      } else {
+        const verification = await verifyCashfreePaymentSession(cfOrder.orderId);
+        if (verification.success && verification.order) {
+          setOrders((prev) => [verification.order!, ...prev.filter((o) => o.id !== cfOrder.orderId)]);
+          setCart([]);
+          setAppliedCoupon(null);
+          setSelectedOrderForTracking(verification.order);
+          onSuccess(verification.order);
+        } else {
+          onFailure('Payment could not be verified.');
+        }
+      }
+    } catch (err: any) {
+      console.error('Cashfree checkout error:', err);
+      onFailure(err.message || 'Cashfree payment failed to initiate');
+    }
   };
 
   // Razorpay Standard Checkout Flow
@@ -1396,6 +1484,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         applyCoupon,
         removeCoupon,
         placeOrder,
+        processCashfreePayment,
         processRazorpayPayment,
         submitProductReview,
         updateOrderStatus,

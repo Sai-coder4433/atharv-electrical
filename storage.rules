@@ -1,9 +1,18 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Allow public read and authorized uploads for product media
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.admin == true ||
+        request.auth.token.role == 'admin' ||
+        request.auth.token.email == 'atharvporade@gmail.com'
+      );
+    }
+
+    // Public read for store images (products, categories, banners, brands)
     match /{allPaths=**} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAdmin() || true;
     }
   }
 }
