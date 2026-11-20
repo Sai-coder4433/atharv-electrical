@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Product,
   Category,
@@ -324,20 +325,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // Mode & Views
   const [activeMode, setActiveMode] = useState<'customer' | 'admin'>('customer');
-  const [customerView, setCustomerViewState] = useState<string>(() => {
-    const hash = window.location.hash.replace(/^#\/?/, '').split('?')[0];
-    return hash || 'home';
-  });
 
+  // Customer View is derived directly from React Router location
+  const customerView = useMemo(() => {
+    const cleanPath = location.pathname.replace(/^\//, '').split('/')[0];
+    return cleanPath || 'home';
+  }, [location.pathname]);
+
+  // Navigate reliably across all customer routes using React Router
   const setCustomerView = useCallback((newView: string) => {
-    setCustomerViewState(newView);
-    const targetHash = newView === 'home' ? '#/' : `#/${newView}`;
-    if (window.location.hash.split('?')[0] !== targetHash) {
-      window.location.hash = targetHash;
+    const targetPath = newView === 'home' ? '/' : `/${newView}`;
+    if (location.pathname !== targetPath) {
+      navigate(targetPath);
     }
-  }, []);
+  }, [location.pathname, navigate]);
 
   const [adminView, setAdminView] = useState<string>('dashboard');
 

@@ -22,6 +22,9 @@ export default defineConfig(() => {
         '/api/cashfree/create-order': {
           target: 'https://us-central1-atharv-electrical-chakan.cloudfunctions.net',
           changeOrigin: true,
+          headers: {
+            origin: 'https://atharvelectrical.com',
+          },
           rewrite: (path) => path.replace(/^\/api\/cashfree\/create-order/, '/createCashfreeOrder'),
         },
         '/api/cashfree/verify-payment': {

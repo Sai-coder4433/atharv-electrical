@@ -86,16 +86,55 @@ export const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Column 3: Customer Support */}
+          {/* Column 3: Customer Support & Policies */}
           <div>
             <h4 className="text-xs font-bold uppercase tracking-wider text-white mb-3">
-              Customer Support
+              Customer Support & Policies
             </h4>
             <ul className="space-y-2 text-xs text-gray-400">
               <li>
-                <a href="tel:+917720036820" className="hover:text-white transition-colors">
+                <button
+                  onClick={() => {
+                    setCustomerView('contact');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-white transition-colors text-left"
+                >
                   Contact Us
-                </a>
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setCustomerView('terms');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-white transition-colors text-left"
+                >
+                  Terms & Conditions
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setCustomerView('refunds');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-white transition-colors text-left"
+                >
+                  Refund & Cancellation Policy
+                </button>
+              </li>
+              <li>
+                <button
+                  onClick={() => {
+                    setCustomerView('privacy');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:text-white transition-colors text-left"
+                >
+                  Privacy Policy
+                </button>
               </li>
               <li>
                 <button
@@ -103,20 +142,9 @@ export const Footer: React.FC = () => {
                     setCustomerView('orders');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="hover:text-white transition-colors"
+                  className="hover:text-white transition-colors text-left"
                 >
-                  My Orders
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => {
-                    setCustomerView('location');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="hover:text-white transition-colors"
-                >
-                  Shipping & Dispatch
+                  Order Tracking
                 </button>
               </li>
               <li>
@@ -125,20 +153,9 @@ export const Footer: React.FC = () => {
                     setCustomerView('brands');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="hover:text-white transition-colors"
+                  className="hover:text-white transition-colors text-left"
                 >
                   Brand Warranty
-                </button>
-              </li>
-              <li>
-                <button
-                  onClick={() => {
-                    setCustomerView('location');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="hover:text-white transition-colors"
-                >
-                  Store Location
                 </button>
               </li>
             </ul>
@@ -169,10 +186,51 @@ export const Footer: React.FC = () => {
           </div>
         </div>
 
-        {/* Bottom Bar: Copyright & Simple Payment badges */}
-        <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-gray-500 gap-3">
-          <p>© 2026 ATHARV ELECTRICAL. All rights reserved.</p>
-          <div className="flex items-center gap-3 text-[11px] text-gray-400">
+        {/* Bottom Bar: Copyright & Policy Shortcuts & Simple Payment badges */}
+        <div className="pt-6 border-t border-neutral-800/80 flex flex-col md:flex-row items-center justify-between text-xs text-gray-500 gap-4">
+          <p>© 2026 ATHARV ELECTRICAL. All rights reserved. Manik Chowk, Chakan, Pune, Maharashtra 410501.</p>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-gray-400">
+            <button
+              onClick={() => {
+                setCustomerView('contact');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-white transition-colors"
+            >
+              Contact Us
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => {
+                setCustomerView('terms');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-white transition-colors"
+            >
+              Terms & Conditions
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => {
+                setCustomerView('refunds');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-white transition-colors"
+            >
+              Refunds & Cancellations
+            </button>
+            <span>·</span>
+            <button
+              onClick={() => {
+                setCustomerView('privacy');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-white transition-colors"
+            >
+              Privacy Policy
+            </button>
+          </div>
+          <div className="flex items-center gap-2.5 text-[11px] text-gray-400">
             <span>UPI Payments</span>
             <span>·</span>
             <span>Credit/Debit Cards</span>

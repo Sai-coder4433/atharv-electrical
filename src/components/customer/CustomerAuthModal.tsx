@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, Phone, X, ArrowRight, KeyRound, CheckCircle2 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 
@@ -11,8 +12,10 @@ export const CustomerAuthModal: React.FC = () => {
     loginGoogle,
     sendCustomerPasswordResetEmail,
     showToast,
+    setCustomerView,
   } = useApp();
 
+  const navigate = useNavigate();
   const [tab, setTab] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -63,6 +66,12 @@ export const CustomerAuthModal: React.FC = () => {
 
     if (ok) {
       setIsLoginModalOpen(false);
+      const pendingRedirect = sessionStorage.getItem('ae_pending_redirect');
+      if (pendingRedirect) {
+        sessionStorage.removeItem('ae_pending_redirect');
+        navigate(pendingRedirect);
+        setCustomerView(pendingRedirect.replace(/^\//, ''));
+      }
     }
   };
 
@@ -89,6 +98,12 @@ export const CustomerAuthModal: React.FC = () => {
     setLoading(false);
     if (ok) {
       setIsLoginModalOpen(false);
+      const pendingRedirect = sessionStorage.getItem('ae_pending_redirect');
+      if (pendingRedirect) {
+        sessionStorage.removeItem('ae_pending_redirect');
+        navigate(pendingRedirect);
+        setCustomerView(pendingRedirect.replace(/^\//, ''));
+      }
     }
   };
 

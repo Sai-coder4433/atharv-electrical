@@ -331,7 +331,7 @@ exports.createCashfreeOrder = functions.https.onRequest((req, res) => {
               customer_phone: String(deliveryAddress.mobile || '9999999999').replace(/[^0-9]/g, '').slice(-10),
             },
             order_meta: {
-              return_url: `${req.headers.origin || 'https://atharv-electrical-chakan.web.app'}/#/payment-status?order_id=${orderId}`,
+              return_url: `${(req.headers.origin && req.headers.origin.startsWith('https://')) ? req.headers.origin : 'https://atharvelectrical.com'}/#/payment-status?order_id=${orderId}`,
               notify_url: `https://us-central1-atharv-electrical-chakan.cloudfunctions.net/cashfreeWebhook`,
             },
             order_note: `Atharv Electrical Order ${orderId}`,

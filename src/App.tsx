@@ -14,6 +14,10 @@ import { OffersView } from './components/customer/OffersView';
 import { BrandsView } from './components/customer/BrandsView';
 import { StoreLocationView } from './components/customer/StoreLocationView';
 import { PaymentStatusPage } from './components/customer/PaymentStatusPage';
+import { ContactUsPage } from './components/customer/ContactUsPage';
+import { TermsAndConditionsPage } from './components/customer/TermsAndConditionsPage';
+import { RefundAndCancellationPage } from './components/customer/RefundAndCancellationPage';
+import { PrivacyPolicyPage } from './components/customer/PrivacyPolicyPage';
 import { CustomerAuthModal } from './components/customer/CustomerAuthModal';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AdminLoginPage } from './components/admin/AdminLoginPage';
@@ -81,22 +85,19 @@ interface CustomerViewWrapperProps {
 
 const CustomerViewWrapper: React.FC<CustomerViewWrapperProps> = ({ view }) => {
   const {
-    customerView,
-    setCustomerView,
     selectedProductId,
     setSelectedProductId,
     products,
+    setIsCartOpen,
   } = useApp();
 
-  const navigate = useNavigate();
   const [activeDetailProduct, setActiveDetailProduct] = useState<Product | null>(null);
 
-  // Synchronize router view with AppContext customerView
   useEffect(() => {
-    if (view && view !== customerView) {
-      setCustomerView(view);
+    if (view === 'cart') {
+      setIsCartOpen(true);
     }
-  }, [view, customerView, setCustomerView]);
+  }, [view, setIsCartOpen]);
 
   const currentModalProduct =
     activeDetailProduct || (selectedProductId ? products.find((p) => p.id === selectedProductId) || null : null);
@@ -128,6 +129,10 @@ const CustomerViewWrapper: React.FC<CustomerViewWrapperProps> = ({ view }) => {
         {view === 'brands' && <BrandsView />}
         {view === 'location' && <StoreLocationView />}
         {view === 'payment-status' && <PaymentStatusPage />}
+        {(view === 'contact' || view === 'contact-us') && <ContactUsPage />}
+        {(view === 'terms' || view === 'terms-conditions') && <TermsAndConditionsPage />}
+        {(view === 'refunds' || view === 'refund-policy' || view === 'cancellation-policy') && <RefundAndCancellationPage />}
+        {(view === 'privacy' || view === 'privacy-policy') && <PrivacyPolicyPage />}
       </main>
 
       {/* 3. Customer Footer */}
@@ -198,8 +203,8 @@ const GlobalToastContainer: React.FC = () => {
 
 export default function App() {
   return (
-    <AppProvider>
-      <HashRouter>
+    <HashRouter>
+      <AppProvider>
         <Routes>
           {/* Admin Routes */}
           <Route path="/admin/login" element={<AdminLoginPage />} />
@@ -216,6 +221,8 @@ export default function App() {
           {/* Customer Routes */}
           <Route path="/" element={<CustomerViewWrapper view="home" />} />
           <Route path="/shop" element={<CustomerViewWrapper view="shop" />} />
+          <Route path="/categories" element={<CustomerViewWrapper view="shop" />} />
+          <Route path="/cart" element={<CustomerViewWrapper view="cart" />} />
           <Route path="/checkout" element={<CustomerViewWrapper view="checkout" />} />
           <Route path="/orders" element={<CustomerViewWrapper view="orders" />} />
           <Route path="/order-tracking" element={<CustomerViewWrapper view="order-tracking" />} />
@@ -225,6 +232,15 @@ export default function App() {
           <Route path="/brands" element={<CustomerViewWrapper view="brands" />} />
           <Route path="/location" element={<CustomerViewWrapper view="location" />} />
           <Route path="/payment-status" element={<CustomerViewWrapper view="payment-status" />} />
+          <Route path="/contact" element={<CustomerViewWrapper view="contact" />} />
+          <Route path="/contact-us" element={<CustomerViewWrapper view="contact" />} />
+          <Route path="/terms" element={<CustomerViewWrapper view="terms" />} />
+          <Route path="/terms-conditions" element={<CustomerViewWrapper view="terms" />} />
+          <Route path="/refunds" element={<CustomerViewWrapper view="refunds" />} />
+          <Route path="/refund-policy" element={<CustomerViewWrapper view="refunds" />} />
+          <Route path="/cancellation-policy" element={<CustomerViewWrapper view="refunds" />} />
+          <Route path="/privacy" element={<CustomerViewWrapper view="privacy" />} />
+          <Route path="/privacy-policy" element={<CustomerViewWrapper view="privacy" />} />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -232,7 +248,7 @@ export default function App() {
 
         {/* Global Toast Layer */}
         <GlobalToastContainer />
-      </HashRouter>
-    </AppProvider>
+      </AppProvider>
+    </HashRouter>
   );
 }

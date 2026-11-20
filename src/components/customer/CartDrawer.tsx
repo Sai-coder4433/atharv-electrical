@@ -26,6 +26,9 @@ export const CartDrawer: React.FC = () => {
     applyCoupon,
     removeCoupon,
     setCustomerView,
+    authUser,
+    setIsLoginModalOpen,
+    showToast,
   } = useApp();
 
   const navigate = useNavigate();
@@ -46,6 +49,17 @@ export const CartDrawer: React.FC = () => {
   };
 
   const handleProceedToCheckout = () => {
+    if (cart.length === 0) {
+      showToast('Your cart is empty. Add electrical products before checkout.', 'info');
+      return;
+    }
+    if (!authUser) {
+      sessionStorage.setItem('ae_pending_redirect', '/checkout');
+      setIsCartOpen(false);
+      showToast('Please sign in or register to complete your order', 'info');
+      setIsLoginModalOpen(true);
+      return;
+    }
     setIsCartOpen(false);
     navigate('/checkout');
     setCustomerView('checkout');
