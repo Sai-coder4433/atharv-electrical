@@ -142,7 +142,12 @@ export const CartDrawer: React.FC = () => {
                 {/* Thumbnail */}
                 <div className="w-18 h-18 rounded-lg bg-[#F8F8F7] border border-[#EAEAEA] p-1.5 shrink-0 flex items-center justify-center">
                   <img
-                    src={item.product.mainImage || (item.product.images && item.product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
+                    src={
+                      item.variantImage ||
+                      item.product.mainImage ||
+                      (item.product.images && item.product.images[0]) ||
+                      '/assets/images/hero_fan_bldc_1790620359971.jpg'
+                    }
                     alt={item.product.name}
                     className="w-full h-full object-contain mix-blend-multiply"
                     onError={(e) => {
@@ -161,13 +166,28 @@ export const CartDrawer: React.FC = () => {
                       {item.product.name}
                     </h4>
 
-                    {/* Variant tags */}
-                    {Object.entries(item.selectedVariants).length > 0 && (
-                      <p className="text-[11px] text-[#666666] mt-0.5">
+                    {/* Variant / Color tags */}
+                    {(item.selectedColor || Object.keys(item.selectedVariants).length > 0) && (
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {item.selectedColor && (
+                          <span className="text-[10px] font-semibold text-gray-800 bg-[#FFF3E6] border border-[#FFE0B2] px-1.5 py-0.2 rounded flex items-center gap-1">
+                            {item.selectedColorCode && (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full border border-gray-300 shrink-0"
+                                style={{ backgroundColor: item.selectedColorCode }}
+                              />
+                            )}
+                            <span>Color: {item.selectedColor}</span>
+                          </span>
+                        )}
                         {Object.entries(item.selectedVariants)
-                          .map(([k, v]) => `${k}: ${v}`)
-                          .join(' · ')}
-                      </p>
+                          .filter(([k]) => k !== 'Color')
+                          .map(([k, v]) => (
+                            <span key={k} className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                              {k}: {v}
+                            </span>
+                          ))}
+                      </div>
                     )}
                   </div>
 

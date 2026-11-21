@@ -22,12 +22,14 @@ import {
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Order, OrderStatus } from '../../types';
+import { InvoiceModal } from '../customer/InvoiceModal';
 
 export const AdminOrders: React.FC = () => {
   const { orders, updateOrderStatus, processOrderRefund, setAdminView, authUser, showToast } = useApp();
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
   // Refund modal state
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
@@ -253,6 +255,14 @@ export const AdminOrders: React.FC = () => {
                 Workflow Actions
               </span>
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-[#171717] hover:bg-black text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#FF6A00]" />
+                  <span>Official Tax Invoice</span>
+                </button>
                 {selectedOrder.status === 'Pending' && (
                   <button
                     onClick={() => handleStatusChange(selectedOrder.id, 'Confirmed')}
@@ -554,6 +564,12 @@ export const AdminOrders: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Official Tax Invoice Modal */}
+      <InvoiceModal
+        order={selectedOrder}
+        isOpen={isInvoiceOpen}
+        onClose={() => setIsInvoiceOpen(false)}
+      />
     </div>
   );
 };

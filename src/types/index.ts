@@ -44,11 +44,16 @@ export interface ProductVariant {
   name: string;
   type?: 'color' | 'sweep' | 'wattage' | 'length' | 'gauge' | 'finish' | string;
   value?: string;
+  colorCode?: string;
+  colorName?: string;
   priceDelta?: number;
   sku?: string;
   price?: number;
   stock?: number;
+  lowStockThreshold?: number;
   image?: string;
+  images?: string[];
+  isDefault?: boolean;
   attributes?: Record<string, string>;
   inStock?: boolean;
 }
@@ -100,6 +105,10 @@ export interface CartItem {
   id: string;
   product: Product;
   selectedVariants: Record<string, string>;
+  selectedColor?: string;
+  selectedColorCode?: string;
+  variantImage?: string;
+  variantSku?: string;
   quantity: number;
   unitPrice: number;
 }

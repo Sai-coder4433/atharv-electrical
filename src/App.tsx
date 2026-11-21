@@ -19,6 +19,7 @@ import { TermsAndConditionsPage } from './components/customer/TermsAndConditions
 import { RefundAndCancellationPage } from './components/customer/RefundAndCancellationPage';
 import { PrivacyPolicyPage } from './components/customer/PrivacyPolicyPage';
 import { CustomerAuthModal } from './components/customer/CustomerAuthModal';
+import { StickyBottomCartBar } from './components/customer/StickyBottomCartBar';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { AdminLoginPage } from './components/admin/AdminLoginPage';
 import { Footer } from './components/customer/Footer';
@@ -114,7 +115,7 @@ const CustomerViewWrapper: React.FC<CustomerViewWrapperProps> = ({ view }) => {
       <MobileHeader />
 
       {/* 2. Main Customer View Body */}
-      <main className="flex-1 pb-16 md:pb-0">
+      <main className="flex-1 pb-32 lg:pb-12">
         {view === 'home' && (
           <HomePage onOpenProductDetail={(prod) => setActiveDetailProduct(prod)} />
         )}
@@ -141,19 +142,22 @@ const CustomerViewWrapper: React.FC<CustomerViewWrapperProps> = ({ view }) => {
       {/* 4. Bottom Mobile Navigation */}
       <BottomMobileNavigation />
 
-      {/* 5. Cart Slide-Out Drawer */}
+      {/* 5. Sticky Bottom Cart Bar (Blinkit Style) */}
+      <StickyBottomCartBar />
+
+      {/* 6. Cart Slide-Out Drawer */}
       <CartDrawer />
 
-      {/* 6. Product Detail Modal */}
+      {/* 7. Product Detail Modal */}
       {currentModalProduct && (
         <ProductDetailModal product={currentModalProduct} onClose={handleCloseDetail} />
       )}
 
-      {/* 7. Customer Auth Modal */}
+      {/* 8. Customer Auth Modal */}
       <CustomerAuthModal />
 
-      {/* 8. Floating WhatsApp Store Contact Trigger */}
-      <div className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-30 flex flex-col items-end gap-2.5">
+      {/* 9. Floating WhatsApp Store Contact Trigger */}
+      <div className="fixed bottom-28 lg:bottom-6 right-4 sm:right-6 z-30 flex flex-col items-end gap-2.5">
         <a
           href={`https://wa.me/${STORE_LOCATION_DATA.whatsapp}?text=Hi%20ATHARV%20ELECTRICAL,%20I%20have%20an%20inquiry%20regarding%20electrical%20products.`}
           target="_blank"

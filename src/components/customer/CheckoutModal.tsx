@@ -24,7 +24,9 @@ import {
   Check,
   AlertCircle,
   Building,
+  FileText,
 } from 'lucide-react';
+import { InvoiceModal } from './InvoiceModal';
 import { DeliveryAddress, Order, ShiprocketCourierRate } from '../../types';
 import { useApp } from '../../context/AppContext';
 import {
@@ -59,6 +61,7 @@ export const CheckoutModal: React.FC = () => {
   // Steps: 1: Customer & Address, 2: Payment, 3: Order Success
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [confirmedOrder, setConfirmedOrder] = useState<Order | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -911,21 +914,46 @@ export const CheckoutModal: React.FC = () => {
               {/* Product Mini Items List */}
               <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                 {cart.map((item) => (
-                  <div key={item.product.id} className="flex gap-3 text-xs">
+                  <div key={item.id} className="flex gap-3 text-xs">
                     <img
-                      src={item.product.mainImage || item.product.images?.[0] || 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c'}
+                      src={
+                        item.variantImage ||
+                        item.product.mainImage ||
+                        item.product.images?.[0] ||
+                        '/assets/images/hero_fan_bldc_1790620359971.jpg'
+                      }
                       alt={item.product.name}
-                      className="w-12 h-12 rounded-xl object-cover bg-gray-50 border border-gray-100 shrink-0"
+                      className="w-12 h-12 rounded-xl object-contain bg-white border border-gray-100 shrink-0 p-1"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{item.product.name}</p>
                       <p className="text-[11px] text-gray-500">
                         Qty: {item.quantity} · ₹{item.unitPrice.toLocaleString('en-IN')} each
                       </p>
-                      {item.selectedVariants && Object.keys(item.selectedVariants).length > 0 && (
-                        <p className="text-[10px] text-orange-600 font-medium">
-                          {Object.entries(item.selectedVariants).map(([k, v]) => `${k}: ${v}`).join(', ')}
-                        </p>
+                      {(item.selectedColor || (item.selectedVariants && Object.keys(item.selectedVariants).length > 0)) && (
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          {item.selectedColor && (
+                            <span className="text-[10px] text-orange-700 bg-orange-50 border border-orange-200 px-1.5 py-0.2 rounded font-semibold flex items-center gap-1">
+                              {item.selectedColorCode && (
+                                <span
+                                  className="w-2 h-2 rounded-full border border-gray-300"
+                                  style={{ backgroundColor: item.selectedColorCode }}
+                                />
+                              )}
+                              <span>Color: {item.selectedColor}</span>
+                            </span>
+                          )}
+                          {Object.entries(item.selectedVariants || {})
+                            .filter(([k]) => k !== 'Color')
+                            .map(([k, v]) => (
+                              <span key={k} className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded">
+                                {k}: {v}
+                              </span>
+                            ))}
+                        </div>
                       )}
                     </div>
                     <span className="font-bold text-gray-900 shrink-0">
@@ -1106,15 +1134,22 @@ export const CheckoutModal: React.FC = () => {
 
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
+                onClick={() => setIsInvoiceOpen(true)}
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-[#171717] hover:bg-black shadow-xs flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <FileText className="w-4 h-4 text-[#FF6A00]" />
+                <span>View & Print Tax Invoice</span>
+              </button>
+              <button
                 onClick={() => setCustomerView('order-tracking')}
-                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-atharvay-gradient shadow-xs hover:shadow flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-white bg-atharvay-gradient shadow-xs hover:shadow flex items-center justify-center gap-2 transition-all active:scale-95"
               >
                 <Truck className="w-4 h-4" />
                 <span>Track My Order</span>
               </button>
               <button
                 onClick={() => setCustomerView('shop')}
-                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-4 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 flex items-center justify-center gap-2 transition-all active:scale-95"
               >
                 <ShoppingBag className="w-4 h-4" />
                 <span>Continue Shopping</span>
@@ -1123,6 +1158,13 @@ export const CheckoutModal: React.FC = () => {
           </div>
         )
       )}
+
+      {/* Tax Invoice Modal */}
+      <InvoiceModal
+        order={confirmedOrder}
+        isOpen={isInvoiceOpen}
+        onClose={() => setIsInvoiceOpen(false)}
+      />
     </div>
   );
 };

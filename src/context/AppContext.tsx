@@ -195,7 +195,13 @@ interface AppContextType {
   setIsMobileFilterOpen: (open: boolean) => void;
 
   // Customer Methods
-  addToCart: (product: Product, variants?: Record<string, string>, qty?: number) => void;
+  addToCart: (
+    product: Product,
+    variants?: Record<string, string>,
+    qty?: number,
+    isBuyNow?: boolean,
+    bypassAuth?: boolean
+  ) => boolean;
   updateCartQuantity: (itemId: string, delta: number) => void;
   removeFromCart: (itemId: string) => void;
   clearCart: () => void;
@@ -829,9 +835,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const cartTotal = Math.max(0, cartSubtotal - cartDiscount + cartDeliveryCharge);
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
-  // Cart Actions
-  const addToCart = (product: Product, variants?: Record<string, string>, qty: number = 1) => {
+  // Cart Actions (Enforces Mandatory Customer Login Gate)
+  const addToCart = (
+    product: Product,
+    variants?: Record<string, string>,
+    qty: number = 1,
+    isBuyNow: boolean = false,
+    bypassAuth: boolean = false
+  ): boolean => {
     const selected = variants || {};
+
+    // 4. Customer Login & Authentication (Mandatory Gate for Cart)
+    if (!authUser && !bypassAuth) {
+      try {
+        sessionStorage.setItem(
+          'ae_pending_cart_action',
+          JSON.stringify({
+            product,
+            variants: selected,
+            qty,
+            isBuyNow,
+          })
+        );
+      } catch (e) {
+        console.warn('Failed to save pending cart action to sessionStorage:', e);
+      }
+      showToast('Please sign in to add items to your cart or purchase', 'info');
+      setIsLoginModalOpen(true);
+      return false;
+    }
+
     const variantKey = Object.entries(selected)
       .map(([k, v]) => `${k}:${v}`)
       .sort()
@@ -839,11 +872,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cartItemId = `${product.id}-${variantKey}`;
 
     let finalUnitPrice = product.sellingPrice;
+    let selectedColorName: string | undefined = selected['Color'];
+    let selectedColorCode: string | undefined;
+    let variantImage: string | undefined;
+    let variantSku: string | undefined;
+
     if (product.variants && variants) {
       for (const [k, v] of Object.entries(variants)) {
-        const found = product.variants.find((vr) => vr.name === k && vr.value === v);
-        if (found && found.priceDelta) {
-          finalUnitPrice += found.priceDelta;
+        const found = product.variants.find((vr) => (vr.name === k || vr.colorName === v) && (vr.value === v || vr.colorName === v));
+        if (found) {
+          if (found.priceDelta) finalUnitPrice += found.priceDelta;
+          if (found.colorCode) selectedColorCode = found.colorCode;
+          if (found.colorName) selectedColorName = found.colorName;
+          if (found.image) variantImage = found.image;
+          if (found.sku) variantSku = found.sku;
         }
       }
     }
@@ -861,13 +903,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: cartItemId,
           product,
           selectedVariants: selected,
+          selectedColor: selectedColorName,
+          selectedColorCode,
+          variantImage: variantImage || product.mainImage,
+          variantSku: variantSku || product.sku,
           quantity: qty,
           unitPrice: finalUnitPrice,
         },
       ];
     });
 
-    showToast(`Added "${product.name}" to cart`, 'success');
+    showToast(`Added "${product.name}"${selectedColorName ? ` (${selectedColorName})` : ''} to cart`, 'success');
+    return true;
   };
 
   const updateCartQuantity = (itemId: string, delta: number) => {

@@ -13,6 +13,7 @@ export const CustomerAuthModal: React.FC = () => {
     sendCustomerPasswordResetEmail,
     showToast,
     setCustomerView,
+    addToCart,
   } = useApp();
 
   const navigate = useNavigate();
@@ -27,6 +28,37 @@ export const CustomerAuthModal: React.FC = () => {
   const [resetSent, setResetSent] = useState(false);
 
   if (!isLoginModalOpen) return null;
+
+  const handlePostAuthActions = () => {
+    setIsLoginModalOpen(false);
+
+    // 1. Automatically resume pending Add to Cart / Buy Now
+    try {
+      const raw = sessionStorage.getItem('ae_pending_cart_action');
+      if (raw) {
+        sessionStorage.removeItem('ae_pending_cart_action');
+        const pending = JSON.parse(raw);
+        if (pending && pending.product) {
+          addToCart(pending.product, pending.variants, pending.qty || 1, false, true);
+          if (pending.isBuyNow) {
+            navigate('/checkout');
+            setCustomerView('checkout');
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error resuming pending cart action:', e);
+    }
+
+    // 2. Process Pending Redirect if any
+    const pendingRedirect = sessionStorage.getItem('ae_pending_redirect');
+    if (pendingRedirect) {
+      sessionStorage.removeItem('ae_pending_redirect');
+      navigate(pendingRedirect);
+      setCustomerView(pendingRedirect.replace(/^\//, ''));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,13 +97,7 @@ export const CustomerAuthModal: React.FC = () => {
     setLoading(false);
 
     if (ok) {
-      setIsLoginModalOpen(false);
-      const pendingRedirect = sessionStorage.getItem('ae_pending_redirect');
-      if (pendingRedirect) {
-        sessionStorage.removeItem('ae_pending_redirect');
-        navigate(pendingRedirect);
-        setCustomerView(pendingRedirect.replace(/^\//, ''));
-      }
+      handlePostAuthActions();
     }
   };
 
@@ -97,13 +123,7 @@ export const CustomerAuthModal: React.FC = () => {
     const ok = await loginGoogle();
     setLoading(false);
     if (ok) {
-      setIsLoginModalOpen(false);
-      const pendingRedirect = sessionStorage.getItem('ae_pending_redirect');
-      if (pendingRedirect) {
-        sessionStorage.removeItem('ae_pending_redirect');
-        navigate(pendingRedirect);
-        setCustomerView(pendingRedirect.replace(/^\//, ''));
-      }
+      handlePostAuthActions();
     }
   };
 

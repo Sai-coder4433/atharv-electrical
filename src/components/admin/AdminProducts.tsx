@@ -14,6 +14,7 @@ import {
   Sparkles,
   Percent,
   AlertTriangle,
+  Palette,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { Product, Brand, ProductVariant } from '../../types';
@@ -185,7 +186,14 @@ export const AdminProducts: React.FC = () => {
       specifications: specsArray,
       warranty: prod.warranty || '2 Years',
       enableVariants: Boolean(prod.variants && prod.variants.length > 0),
-      variants: prod.variants || [],
+      variants: (prod.variants || []).map((v) => ({
+        ...v,
+        colorName: v.colorName || v.value || 'Color',
+        colorCode: v.colorCode || '#4A2E18',
+        sku: v.sku || `${prod.sku}-${(v.value || 'V').substring(0, 3).toUpperCase()}`,
+        stock: v.stock !== undefined ? v.stock : prod.stock,
+        image: v.image || prod.mainImage || '',
+      })),
       slug: prod.slug,
       seoTitle: prod.seoTitle || prod.name,
       seoDescription: prod.seoDescription || prod.shortDescription,
@@ -255,6 +263,40 @@ export const AdminProducts: React.FC = () => {
       showToast(`${successCount} product image(s) compressed & uploaded!`, 'success');
     } catch (err: any) {
       showToast(err.message || 'Image upload failed', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const COLOR_PRESETS = [
+    { name: 'Pearl White', code: '#FFFFFF', delta: 0 },
+    { name: 'Matt Brown', code: '#4A2E18', delta: 0 },
+    { name: 'Smoke Grey', code: '#708090', delta: 0 },
+    { name: 'Glossy Black', code: '#1A1A1A', delta: 0 },
+    { name: 'Rose Gold', code: '#B76E79', delta: 250 },
+    { name: 'Golden Antique', code: '#D4AF37', delta: 350 },
+    { name: 'Metallic Silver', code: '#C0C0C0', delta: 150 },
+    { name: 'Ivory', code: '#FFFFF0', delta: 0 },
+  ];
+
+  const handleVariantImageUpload = async (file: File, vIdx: number) => {
+    if (!file) return;
+    setIsUploading(true);
+    try {
+      const targetFolder = editingProduct ? `products/${editingProduct.id}/variants` : 'products/variants';
+      const url = await uploadToStorage(file, targetFolder);
+      setForm((prev) => {
+        const newV = [...prev.variants];
+        newV[vIdx] = {
+          ...newV[vIdx],
+          image: url,
+          images: [url, ...(newV[vIdx].images || []).filter((x) => x !== url)],
+        };
+        return { ...prev, variants: newV };
+      });
+      showToast('Variant color image uploaded successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Variant image upload failed', 'error');
     } finally {
       setIsUploading(false);
     }
@@ -519,6 +561,23 @@ export const AdminProducts: React.FC = () => {
                       <td className="py-3 px-4 max-w-xs">
                         <p className="font-bold text-gray-900 line-clamp-1">{p.name}</p>
                         <span className="text-[11px] font-mono text-gray-400 block">{p.sku}</span>
+                        {p.variants && p.variants.length > 0 && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-[10px] font-bold text-[#FF6A00] bg-[#FFF3E6] border border-[#FFE0B2] px-1.5 py-0.5 rounded">
+                              {p.variants.length} Colors
+                            </span>
+                            <div className="flex items-center -space-x-1">
+                              {p.variants.slice(0, 5).map((vr) => (
+                                <span
+                                  key={vr.id}
+                                  className="w-3 h-3 rounded-full border border-white shadow-xs inline-block"
+                                  style={{ backgroundColor: vr.colorCode || '#D1D5DB' }}
+                                  title={`${vr.colorName || vr.value || 'Color'}${vr.stock !== undefined ? ` (${vr.stock} in stock)` : ''}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="py-3 px-4">
                         <span className="font-semibold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
@@ -1116,95 +1175,321 @@ export const AdminProducts: React.FC = () => {
                 </div>
               )}
 
-              {/* SECTION 7: Variants */}
+              {/* SECTION 7: Amazon/Flipkart Color Variants */}
               {activeFormSection === 7 && (
-                <div className="space-y-3.5">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-sm text-gray-900">Section 7: Product Variants</h4>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                        <Palette className="w-4 h-4 text-[#FF6A00]" />
+                        <span>Section 7: Color Variants (Amazon / Flipkart Style)</span>
+                      </h4>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        Manage swatches, variant-specific images, SKUs, and stock per color. Products without variants remain unaffected.
+                      </p>
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer bg-gray-50 hover:bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-200 transition-colors">
                       <input
                         type="checkbox"
                         checked={form.enableVariants}
                         onChange={(e) => setForm((prev) => ({ ...prev, enableVariants: e.target.checked }))}
-                        className="rounded text-[#FF6A00]"
+                        className="rounded text-[#FF6A00] focus:ring-[#FF6A00]"
                       />
-                      <span className="font-bold text-gray-800">Enable Variants for Product</span>
+                      <span className="font-bold text-xs text-gray-800">Enable Color Variants</span>
                     </label>
                   </div>
 
                   {form.enableVariants && (
-                    <div className="space-y-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setForm((prev) => ({
-                            ...prev,
-                            variants: [
-                              ...prev.variants,
-                              {
-                                id: `v-${Date.now()}`,
-                                name: 'Color',
-                                value: 'Matt Brown',
-                                priceDelta: 0,
-                                sku: `${prev.sku}-MB`,
-                              },
-                            ],
-                          }))
-                        }
-                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white bg-[#171717] hover:bg-black"
-                      >
-                        + Add Variant
-                      </button>
-
-                      {form.variants.map((vr, vIdx) => (
-                        <div key={vr.id} className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap gap-2 items-center">
-                          <input
-                            type="text"
-                            placeholder="Attribute (Color, Wattage, Sweep)"
-                            value={vr.name}
-                            onChange={(e) => {
-                              const newV = [...form.variants];
-                              newV[vIdx].name = e.target.value;
-                              setForm((prev) => ({ ...prev, variants: newV }));
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg border border-gray-200 w-36"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Option Value (e.g. 1200mm, White)"
-                            value={vr.value || ''}
-                            onChange={(e) => {
-                              const newV = [...form.variants];
-                              newV[vIdx].value = e.target.value;
-                              setForm((prev) => ({ ...prev, variants: newV }));
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg border border-gray-200 w-36"
-                          />
-                          <input
-                            type="number"
-                            placeholder="Price +/- (₹)"
-                            value={vr.priceDelta || 0}
-                            onChange={(e) => {
-                              const newV = [...form.variants];
-                              newV[vIdx].priceDelta = Number(e.target.value);
-                              setForm((prev) => ({ ...prev, variants: newV }));
-                            }}
-                            className="px-2.5 py-1.5 rounded-lg border border-gray-200 w-28"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setForm((prev) => ({
-                                ...prev,
-                                variants: prev.variants.filter((_, i) => i !== vIdx),
-                              }));
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-600"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                    <div className="space-y-4 pt-1">
+                      {/* 1-Click Quick Color Presets */}
+                      <div className="bg-[#FFF8F2] border border-[#FFE0B2] p-3 rounded-2xl">
+                        <span className="text-[11px] font-bold text-gray-700 block mb-2">
+                          Quick-Add Standard Indian Electrical Colors:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {COLOR_PRESETS.map((preset) => {
+                            const isAdded = form.variants.some(
+                              (v) => (v.colorName || v.value)?.toLowerCase() === preset.name.toLowerCase()
+                            );
+                            return (
+                              <button
+                                key={preset.name}
+                                type="button"
+                                disabled={isAdded}
+                                onClick={() => {
+                                  const shortCode = preset.name.split(' ').map((n) => n[0]).join('').toUpperCase();
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    variants: [
+                                      ...prev.variants,
+                                      {
+                                        id: `v-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                                        name: 'Color',
+                                        value: preset.name,
+                                        colorName: preset.name,
+                                        colorCode: preset.code,
+                                        priceDelta: preset.delta,
+                                        sku: `${prev.sku || 'PROD'}-${shortCode}`,
+                                        stock: Number(prev.stock) || 10,
+                                        isDefault: prev.variants.length === 0,
+                                        image: prev.mainImage || '',
+                                        images: prev.mainImage ? [prev.mainImage] : [],
+                                      },
+                                    ],
+                                  }));
+                                }}
+                                className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition-all ${
+                                  isAdded
+                                    ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                                    : 'bg-white hover:bg-orange-50 text-gray-800 border-gray-300 hover:border-[#FF6A00] shadow-2xs'
+                                }`}
+                              >
+                                <span
+                                  className="w-3 h-3 rounded-full border border-gray-300 shadow-2xs shrink-0"
+                                  style={{ backgroundColor: preset.code }}
+                                />
+                                <span>{preset.name}</span>
+                                {preset.delta > 0 && (
+                                  <span className="text-[10px] text-gray-500 font-mono">+₹{preset.delta}</span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
-                      ))}
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setForm((prev) => ({
+                              ...prev,
+                              variants: [
+                                ...prev.variants,
+                                {
+                                  id: `v-${Date.now()}`,
+                                  name: 'Color',
+                                  value: 'Custom Color',
+                                  colorName: 'Custom Color',
+                                  colorCode: '#FF6A00',
+                                  priceDelta: 0,
+                                  sku: `${prev.sku || 'PROD'}-CLR`,
+                                  stock: Number(prev.stock) || 10,
+                                  isDefault: prev.variants.length === 0,
+                                  image: prev.mainImage || '',
+                                  images: prev.mainImage ? [prev.mainImage] : [],
+                                },
+                              ],
+                            }))
+                          }
+                          className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#171717] hover:bg-black flex items-center gap-1.5 shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+ Add Custom Color Variant</span>
+                        </button>
+                        <span className="text-xs text-gray-500 font-medium">
+                          {form.variants.length} variant{form.variants.length === 1 ? '' : 's'} configured
+                        </span>
+                      </div>
+
+                      {/* Variant Cards List */}
+                      <div className="space-y-3">
+                        {form.variants.map((vr, vIdx) => (
+                          <div
+                            key={vr.id}
+                            className={`p-3.5 rounded-2xl border transition-all ${
+                              vr.isDefault
+                                ? 'bg-[#FFFDF9] border-[#FF8A00] shadow-xs'
+                                : 'bg-gray-50/80 border-gray-200'
+                            }`}
+                          >
+                            {/* Row 1: Swatch, Color Name, Default Badge, and Delete */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-gray-200/80">
+                              <div className="flex items-center gap-2.5">
+                                {/* Visual Swatch Preview & Color Picker */}
+                                <div className="relative group">
+                                  <input
+                                    type="color"
+                                    value={vr.colorCode || '#4A2E18'}
+                                    onChange={(e) => {
+                                      const newV = [...form.variants];
+                                      newV[vIdx].colorCode = e.target.value;
+                                      setForm((prev) => ({ ...prev, variants: newV }));
+                                    }}
+                                    className="opacity-0 absolute inset-0 w-8 h-8 cursor-pointer z-10"
+                                    title="Click to pick swatch color"
+                                  />
+                                  <div
+                                    className="w-8 h-8 rounded-full border-2 border-white shadow-sm flex items-center justify-center ring-2 ring-gray-200 group-hover:ring-[#FF6A00] transition-all cursor-pointer"
+                                    style={{ backgroundColor: vr.colorCode || '#4A2E18' }}
+                                  >
+                                    <Palette className="w-3 h-3 text-white mix-blend-difference opacity-70" />
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Color Name (e.g. Matt Brown)"
+                                    value={vr.colorName || vr.value || ''}
+                                    onChange={(e) => {
+                                      const newV = [...form.variants];
+                                      newV[vIdx].colorName = e.target.value;
+                                      newV[vIdx].value = e.target.value;
+                                      setForm((prev) => ({ ...prev, variants: newV }));
+                                    }}
+                                    className="font-bold text-xs text-gray-900 px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white w-44"
+                                  />
+                                  <input
+                                    type="text"
+                                    placeholder="#Hex"
+                                    value={vr.colorCode || ''}
+                                    onChange={(e) => {
+                                      const newV = [...form.variants];
+                                      newV[vIdx].colorCode = e.target.value;
+                                      setForm((prev) => ({ ...prev, variants: newV }));
+                                    }}
+                                    className="font-mono text-xs text-gray-600 px-2 py-1.5 rounded-lg border border-gray-300 bg-white w-24"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold text-gray-700">
+                                  <input
+                                    type="radio"
+                                    name="defaultColorVariant"
+                                    checked={Boolean(vr.isDefault)}
+                                    onChange={() => {
+                                      const newV = form.variants.map((v, i) => ({
+                                        ...v,
+                                        isDefault: i === vIdx,
+                                      }));
+                                      setForm((prev) => ({ ...prev, variants: newV }));
+                                    }}
+                                    className="text-[#FF6A00] focus:ring-[#FF6A00]"
+                                  />
+                                  <span className={vr.isDefault ? 'text-[#FF6A00] font-bold' : ''}>
+                                    {vr.isDefault ? 'Default Color' : 'Set as Default'}
+                                  </span>
+                                </label>
+
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setForm((prev) => ({
+                                      ...prev,
+                                      variants: prev.variants.filter((_, i) => i !== vIdx),
+                                    }));
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete Variant"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Row 2: SKU, Stock, Price Delta (+/-) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2.5 text-xs">
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                                  Variant SKU
+                                </label>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. ORI-AERO-MB"
+                                  value={vr.sku || ''}
+                                  onChange={(e) => {
+                                    const newV = [...form.variants];
+                                    newV[vIdx].sku = e.target.value;
+                                    setForm((prev) => ({ ...prev, variants: newV }));
+                                  }}
+                                  className="w-full font-mono px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                                  Stock (Units)
+                                </label>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  placeholder="Stock"
+                                  value={vr.stock !== undefined ? vr.stock : form.stock}
+                                  onChange={(e) => {
+                                    const newV = [...form.variants];
+                                    newV[vIdx].stock = Number(e.target.value);
+                                    setForm((prev) => ({ ...prev, variants: newV }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-[11px] font-bold text-gray-600 mb-1">
+                                  Price Delta (+/- ₹)
+                                </label>
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  value={vr.priceDelta || 0}
+                                  onChange={(e) => {
+                                    const newV = [...form.variants];
+                                    newV[vIdx].priceDelta = Number(e.target.value);
+                                    setForm((prev) => ({ ...prev, variants: newV }));
+                                  }}
+                                  className="w-full px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Row 3: Color-Specific Image Upload & URL */}
+                            <div className="pt-2.5 flex flex-col sm:flex-row sm:items-center gap-3">
+                              <div className="w-12 h-12 rounded-xl border border-gray-200 bg-white p-1 flex items-center justify-center shrink-0 overflow-hidden">
+                                <img
+                                  src={vr.image || form.mainImage || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
+                                  alt=""
+                                  className="w-full h-full object-contain"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/assets/images/hero_fan_bldc_1790620359971.jpg';
+                                  }}
+                                />
+                              </div>
+
+                              <div className="flex-1 flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="Color Variant Image URL (or upload below)"
+                                  value={vr.image || ''}
+                                  onChange={(e) => {
+                                    const newV = [...form.variants];
+                                    newV[vIdx].image = e.target.value;
+                                    newV[vIdx].images = [e.target.value];
+                                    setForm((prev) => ({ ...prev, variants: newV }));
+                                  }}
+                                  className="flex-1 text-xs px-2.5 py-1.5 rounded-lg border border-gray-300 bg-white"
+                                />
+
+                                <label className="cursor-pointer px-3 py-1.5 rounded-lg text-xs font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-300 flex items-center gap-1.5 shrink-0 transition-colors">
+                                  <Upload className="w-3.5 h-3.5 text-[#FF6A00]" />
+                                  <span>Upload Image</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) handleVariantImageUpload(file, vIdx);
+                                    }}
+                                  />
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

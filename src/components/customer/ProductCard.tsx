@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, Star, ShoppingBag, Eye, Zap, Check } from 'lucide-react';
-import { Product } from '../../types';
+import { Product, ProductVariant } from '../../types';
 import { useApp } from '../../context/AppContext';
 
 interface ProductCardProps {
@@ -16,19 +16,41 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const { addToCart, wishlist, toggleWishlist, setSelectedProductId, setCustomerView } = useApp();
   const [isAdded, setIsAdded] = useState(false);
 
+  // Identify color variants (Amazon/Flipkart style)
+  const colorVariants: ProductVariant[] = (product.variants || []).filter(
+    (v) => v.name?.toLowerCase().includes('color') || Boolean(v.colorCode) || Boolean(v.colorName)
+  );
+
+  const defaultVariant = product.variants?.find((v) => v.isDefault) || colorVariants[0] || product.variants?.[0];
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(defaultVariant ? defaultVariant.id : null);
+
+  const activeVariant = (product.variants || []).find((v) => v.id === selectedVariantId) || defaultVariant;
+
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
     if (product.variants && product.variants.length > 0) {
       const types = Array.from(new Set(product.variants.map((v) => v.name)));
       types.forEach((type) => {
         const first = product.variants?.find((v) => v.name === type);
-        if (first && first.value) initial[type] = first.value;
+        if (first && (first.colorName || first.value)) {
+          initial[type] = first.colorName || first.value as string;
+        }
       });
     }
     return initial;
   });
 
   const isWishlisted = wishlist.includes(product.id);
+
+  // Dynamic Image from selected color variant
+  const currentCardImage =
+    activeVariant?.image ||
+    product.mainImage ||
+    (product.images && product.images[0]) ||
+    '/assets/images/hero_fan_bldc_1790620359971.jpg';
+
+  // Dynamic Price
+  const currentPrice = product.sellingPrice + (activeVariant?.priceDelta || 0);
 
   const handleCardClick = () => {
     setSelectedProductId(product.id);
@@ -37,9 +59,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     }
   };
 
+  const handleColorSelect = (e: React.MouseEvent, vr: ProductVariant) => {
+    e.stopPropagation();
+    setSelectedVariantId(vr.id);
+    setSelectedVariants((prev) => ({
+      ...prev,
+      [vr.name || 'Color']: vr.colorName || vr.value || 'Color',
+    }));
+  };
+
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    addToCart(product, selectedVariants, 1);
+    const payload = { ...selectedVariants };
+    if (activeVariant) {
+      payload[activeVariant.name || 'Color'] = activeVariant.colorName || activeVariant.value || 'Color';
+    }
+    addToCart(product, payload, 1, false);
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 1400);
   };
@@ -48,16 +83,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleBuyNow = (e: React.MouseEvent) => {
     e.stopPropagation();
-    addToCart(product, selectedVariants, 1);
+    const payload = { ...selectedVariants };
+    if (activeVariant) {
+      payload[activeVariant.name || 'Color'] = activeVariant.colorName || activeVariant.value || 'Color';
+    }
+    addToCart(product, payload, 1, true);
     navigate('/checkout');
     setCustomerView('checkout');
   };
-
-  // Important variant for quick selection
-  const primaryVariantKey = product.variants && product.variants.length > 0 ? product.variants[0].name : null;
-  const primaryVariants = primaryVariantKey
-    ? product.variants?.filter((v) => v.name === primaryVariantKey).slice(0, 3)
-    : [];
 
   return (
     <div
@@ -86,12 +119,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </button>
         </div>
 
-        {/* 2. Product Image */}
+        {/* 2. Product Image — Dynamically switches on color click */}
         <div className="relative w-full aspect-square bg-[#F8F8F7] rounded-xl overflow-hidden flex items-center justify-center p-3 mb-3">
           <img
-            src={product.mainImage || (product.images && product.images[0]) || '/assets/images/hero_fan_bldc_1790620359971.jpg'}
+            key={currentCardImage}
+            src={currentCardImage}
             alt={product.name}
-            className="w-full h-full object-contain mix-blend-multiply transform transition-transform duration-300 group-hover:scale-108"
+            className="w-full h-full object-contain mix-blend-multiply transform transition-transform duration-300 group-hover:scale-108 animate-in fade-in-50 duration-200"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               if (target.dataset.triedFallback) return;
@@ -143,30 +177,36 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </span>
         </div>
 
-        {/* 5. Important Variant Selector */}
-        {primaryVariants && primaryVariants.length > 1 && (
-          <div className="mt-2.5 flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-            <span className="text-[10px] text-[#929292] mr-0.5">{primaryVariantKey}:</span>
-            {primaryVariants.map((vr) => (
-              <button
-                key={vr.id}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (vr.value) {
-                    setSelectedVariants((prev) => ({ ...prev, [vr.name]: vr.value as string }));
-                  }
-                }}
-                className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
-                  selectedVariants[vr.name] === vr.value
-                    ? 'border-[#FF6A00] bg-[#FFF3E6] text-[#FF6A00] font-bold'
-                    : 'border-[#EAEAEA] bg-white text-[#666666]'
-                }`}
-              >
-                {vr.value}
-              </button>
-            ))}
+        {/* 5. Amazon / Flipkart Color Swatch Selector */}
+        {colorVariants.length > 0 ? (
+          <div className="mt-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+            <span className="text-[10px] font-semibold text-[#666666] shrink-0 truncate max-w-[80px]">
+              {activeVariant?.colorName || activeVariant?.value || 'Colors'}:
+            </span>
+            <div className="flex items-center gap-1.5">
+              {colorVariants.slice(0, 5).map((vr) => {
+                const isSelected = activeVariant?.id === vr.id;
+                return (
+                  <button
+                    key={vr.id}
+                    type="button"
+                    onClick={(e) => handleColorSelect(e, vr)}
+                    title={vr.colorName || vr.value}
+                    className={`w-4 h-4 rounded-full border transition-all relative flex items-center justify-center ${
+                      isSelected
+                        ? 'ring-2 ring-[#FF6A00] ring-offset-1 scale-110 border-white'
+                        : 'border-gray-300 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: vr.colorCode || '#888888' }}
+                  />
+                );
+              })}
+              {colorVariants.length > 5 && (
+                <span className="text-[10px] text-gray-400 font-medium">+{colorVariants.length - 5}</span>
+              )}
+            </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* 6. Pricing & Action Buttons */}
@@ -174,9 +214,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         {/* Selling Price + MRP */}
         <div className="flex items-baseline gap-2">
           <span className="text-base sm:text-lg font-bold text-[#171717] tabular-nums">
-            ₹{product.sellingPrice.toLocaleString('en-IN')}
+            ₹{currentPrice.toLocaleString('en-IN')}
           </span>
-          {product.mrp > product.sellingPrice && (
+          {product.mrp > currentPrice && (
             <span className="text-xs text-[#929292] line-through tabular-nums">
               ₹{product.mrp.toLocaleString('en-IN')}
             </span>

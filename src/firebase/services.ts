@@ -22,6 +22,7 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   User,
+  updateProfile,
 } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage, isFirebaseConfigured } from './config';
@@ -2052,6 +2053,23 @@ export const fetchUserCartFromFirestore = async (userId: string): Promise<CartIt
 export const sendCustomerPasswordReset = async (email: string): Promise<void> => {
   if (!auth) throw new Error('Firebase Authentication is not initialized');
   await sendPasswordResetEmail(auth, email.trim());
+};
+
+export const updateCustomerProfileDetails = async (displayName: string, phone?: string): Promise<void> => {
+  if (auth && auth.currentUser) {
+    await updateProfile(auth.currentUser, { displayName });
+    if (db) {
+      await setDoc(
+        doc(db, 'customers', auth.currentUser.uid),
+        {
+          name: displayName,
+          phone: phone || '',
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+    }
+  }
 };
 
 /**

@@ -37,26 +37,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     setSelectedProductId,
   } = useApp();
 
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [checkPin, setCheckPin] = useState(deliveryPincode || '410501');
   const [pinChecked, setPinChecked] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
 
-  // Group variants by type
-  const variantGroups: Record<string, typeof product.variants> = {};
-  if (product.variants) {
-    product.variants.forEach((v) => {
-      if (!variantGroups[v.name]) {
-        variantGroups[v.name] = [];
-      }
-      variantGroups[v.name]!.push(v);
-    });
-  }
+  // Identify Color Variants (Amazon/Flipkart style)
+  const colorVariants = (product.variants || []).filter(
+    (v) => v.name?.toLowerCase().includes('color') || Boolean(v.colorCode) || Boolean(v.colorName)
+  );
+  const otherVariants = (product.variants || []).filter(
+    (v) => !v.name?.toLowerCase().includes('color') && !v.colorCode && !v.colorName
+  );
 
-  // Selected state
+  const defaultColorVariant = (product.variants || []).find((v) => v.isDefault) || colorVariants[0];
+  const [activeVariantId, setActiveVariantId] = useState<string | null>(defaultColorVariant ? defaultColorVariant.id : null);
+  const activeColorVariant = (product.variants || []).find((v) => v.id === activeVariantId) || defaultColorVariant;
+
+  // Group other variants by type
+  const variantGroups: Record<string, typeof product.variants> = {};
+  otherVariants.forEach((v) => {
+    if (!variantGroups[v.name]) {
+      variantGroups[v.name] = [];
+    }
+    variantGroups[v.name]!.push(v);
+  });
+
+  // Selected state for all attributes
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
+    if (activeColorVariant) {
+      initial['Color'] = activeColorVariant.colorName || activeColorVariant.value || 'Color';
+    }
     Object.entries(variantGroups).forEach(([key, list]) => {
       if (list && list.length > 0 && list[0].value) {
         initial[key] = list[0].value;
@@ -65,29 +77,67 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return initial;
   });
 
+  // Dynamic gallery images based on active color variant
+  const galleryImages: string[] = React.useMemo(() => {
+    const list: string[] = [];
+    if (activeColorVariant?.images && activeColorVariant.images.length > 0) {
+      list.push(...activeColorVariant.images);
+    } else if (activeColorVariant?.image) {
+      list.push(activeColorVariant.image);
+    }
+    if (product.images && product.images.length > 0) {
+      product.images.forEach((img) => {
+        if (!list.includes(img)) list.push(img);
+      });
+    }
+    if (list.length === 0 && product.mainImage) {
+      list.push(product.mainImage);
+    }
+    return list.length > 0 ? list : ['/assets/images/hero_fan_bldc_1790620359971.jpg'];
+  }, [activeColorVariant, product.images, product.mainImage]);
+
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+
+  // Switch color handler
+  const handleSelectColor = (vr: any) => {
+    setActiveVariantId(vr.id);
+    setActiveImageIndex(0);
+    setSelectedVariants((prev) => ({
+      ...prev,
+      [vr.name || 'Color']: vr.colorName || vr.value || 'Color',
+    }));
+  };
+
   const isWishlisted = wishlist.includes(product.id);
 
   // Dynamic price calculation
-  let currentUnitPrice = product.sellingPrice;
-  if (product.variants) {
-    for (const [key, val] of Object.entries(selectedVariants)) {
-      const match = product.variants.find((v) => v.name === key && v.value === val);
-      if (match?.priceDelta) {
-        currentUnitPrice += match.priceDelta;
-      }
+  let currentUnitPrice = product.sellingPrice + (activeColorVariant?.priceDelta || 0);
+  for (const [key, val] of Object.entries(selectedVariants)) {
+    if (key === 'Color') continue;
+    const match = otherVariants.find((v) => v.name === key && v.value === val);
+    if (match?.priceDelta) {
+      currentUnitPrice += match.priceDelta;
     }
   }
 
   const navigate = useNavigate();
 
   const handleAddToCart = () => {
-    addToCart(product, selectedVariants, quantity);
+    const payload = { ...selectedVariants };
+    if (activeColorVariant) {
+      payload['Color'] = activeColorVariant.colorName || activeColorVariant.value || 'Color';
+    }
+    addToCart(product, payload, quantity, false);
     setIsAdded(true);
     setTimeout(() => setIsAdded(false), 1400);
   };
 
   const handleBuyNow = () => {
-    addToCart(product, selectedVariants, quantity);
+    const payload = { ...selectedVariants };
+    if (activeColorVariant) {
+      payload['Color'] = activeColorVariant.colorName || activeColorVariant.value || 'Color';
+    }
+    addToCart(product, payload, quantity, true);
     onClose();
     navigate('/checkout');
     setCustomerView('checkout');
@@ -128,14 +178,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div>
               <div className="relative aspect-square bg-[#F8F8F7] rounded-2xl overflow-hidden border border-[#EAEAEA] flex items-center justify-center p-4">
                 <img
-                  src={
-                    (product.images && product.images[activeImageIndex]) ||
-                    product.mainImage ||
-                    (product.images && product.images[0]) ||
-                    '/assets/images/hero_fan_bldc_1790620359971.jpg'
-                  }
+                  key={galleryImages[activeImageIndex] || galleryImages[0]}
+                  src={galleryImages[activeImageIndex] || galleryImages[0]}
                   alt={product.name}
-                  className="w-full h-full object-contain mix-blend-multiply"
+                  className="w-full h-full object-contain mix-blend-multiply animate-in fade-in-50 duration-200"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
                     if (target.dataset.triedFallback) return;
@@ -162,15 +208,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
 
               {/* Thumbnails */}
-              {product.images.length > 1 && (
-                <div className="flex items-center gap-2 mt-3 overflow-x-auto">
-                  {product.images.map((img, idx) => (
+              {galleryImages.length > 1 && (
+                <div className="flex items-center gap-2 mt-3 overflow-x-auto no-scrollbar py-1">
+                  {galleryImages.map((img, idx) => (
                     <button
                       key={idx}
                       onClick={() => setActiveImageIndex(idx)}
-                      className={`w-16 h-16 rounded-xl border-2 p-1 bg-[#F8F8F7] overflow-hidden transition-all ${
+                      className={`w-16 h-16 rounded-xl border-2 p-1 bg-[#F8F8F7] overflow-hidden transition-all shrink-0 ${
                         activeImageIndex === idx
-                          ? 'border-[#FF6A00] shadow-xs'
+                          ? 'border-[#FF6A00] shadow-xs scale-105'
                           : 'border-[#EAEAEA] opacity-70 hover:opacity-100'
                       }`}
                     >
@@ -202,7 +248,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <span className="text-[#666666]">
                   {product.reviewCount.toLocaleString('en-IN')} Customer Ratings
                 </span>
-                <span className="text-[#929292]">· SKU: {product.sku}</span>
+                <span className="text-[#929292]">· SKU: {activeColorVariant?.sku || product.sku}</span>
               </div>
 
               {/* 5. Price & 6. Discount */}
@@ -228,10 +274,62 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {/* 7. Availability */}
               <div className="text-xs font-semibold text-[#168A45] flex items-center gap-1">
                 <Check className="w-3.5 h-3.5" />
-                <span>In Stock ({product.stock} units available at Chakan depot)</span>
+                <span>
+                  In Stock ({activeColorVariant?.stock !== undefined ? activeColorVariant.stock : product.stock} units available at Chakan depot)
+                </span>
               </div>
 
-              {/* 8. Variant Selection */}
+              {/* 8. Amazon / Flipkart Color Variant Swatches */}
+              {colorVariants.length > 0 && (
+                <div className="pt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-bold text-[#171717] flex items-center gap-1.5">
+                      <span>Color:</span>
+                      <span className="text-[#FF6A00] font-extrabold">
+                        {activeColorVariant?.colorName || activeColorVariant?.value || 'Selected'}
+                      </span>
+                    </label>
+                    {activeColorVariant?.stock !== undefined && (
+                      <span className="text-[11px] font-semibold text-[#168A45]">
+                        {activeColorVariant.stock > 0 ? `${activeColorVariant.stock} available` : 'Out of stock'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {colorVariants.map((vr) => {
+                      const isSelected = activeColorVariant?.id === vr.id;
+                      return (
+                        <button
+                          key={vr.id}
+                          type="button"
+                          onClick={() => handleSelectColor(vr)}
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
+                            isSelected
+                              ? 'border-[#FF6A00] bg-[#FFF8F2] shadow-xs scale-102 ring-1 ring-[#FF6A00]'
+                              : 'border-[#EAEAEA] bg-white hover:border-gray-400'
+                          }`}
+                        >
+                          <span
+                            className="w-4 h-4 rounded-full border border-gray-300 shadow-2xs shrink-0"
+                            style={{ backgroundColor: vr.colorCode || '#888888' }}
+                          />
+                          <span className={`text-xs font-bold ${isSelected ? 'text-[#FF6A00]' : 'text-gray-800'}`}>
+                            {vr.colorName || vr.value}
+                          </span>
+                          {vr.priceDelta ? (
+                            <span className="text-[10px] text-gray-500 font-mono">
+                              {vr.priceDelta > 0 ? `(+₹${vr.priceDelta})` : `(-₹${Math.abs(vr.priceDelta)})`}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Other Variant Attributes (e.g. Sweep, Wattage) */}
               {Object.entries(variantGroups).map(([groupName, variants]) => (
                 <div key={groupName} className="pt-1">
                   <label className="text-xs font-bold text-[#171717] block mb-1.5">
